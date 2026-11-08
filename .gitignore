@@ -1,0 +1,26 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Dependencies
+/vendor/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Upload files
+public/uploads/*
+!public/uploads/articles/
+!public/uploads/users/
+!public/uploads/articles/.gitkeep
+!public/uploads/users/.gitkeep
