@@ -1,0 +1,2 @@
+BLOCKED: MySQL 8 server/Docker/php pdo_mysql unavailable in validation environment.
+BLOCKED: Original NEWS HUB repository and database/news_hub.sql not supplied.
