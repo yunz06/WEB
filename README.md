@@ -1,8 +1,10 @@
+
 # NEWS HUB
 
-Website doc va quan ly tin tuc truc tuyen.
+Website đọc và quản lý tin tức trực tuyến.
 
 ## Technologies
+
 - PHP 8.x
 - MySQL 8.x
 - Bootstrap 5
@@ -11,6 +13,7 @@ Website doc va quan ly tin tuc truc tuyen.
 - PDO
 
 ## User Features
+
 - View news
 - View categories
 - Search articles
@@ -18,6 +21,7 @@ Website doc va quan ly tin tuc truc tuyen.
 - Comment on articles
 
 ## Admin Features
+
 - Dashboard
 - Article CRUD
 - Category CRUD
@@ -28,11 +32,13 @@ Website doc va quan ly tin tuc truc tuyen.
 - Pagination
 
 ## Installation
+
 1. Clone repository.
 2. Create MySQL database.
-3. Import database/news_hub.sql.
-4. Configure config/database.php.
+3. Import `database/news_hub.sql`.
+4. Configure `config/database.php`.
 5. Run project using Apache/PHP server.
 
 ## Team
+
 NEWS HUB Development Team
