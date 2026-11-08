@@ -1,0 +1,5 @@
+[PASS] Có heading Dashboard
+[PASS] Có tiêu đề bài viết đã escape
+[PASS] Không chèn script trực tiếp
+[PASS] Giá trị không xác minh không bị đổi thành 0
+[PASS] Hiển thị cảnh báo
