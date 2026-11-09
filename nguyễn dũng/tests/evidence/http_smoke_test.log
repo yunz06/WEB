@@ -1,8 +1,0 @@
-[PASS] H01 Không đăng nhập bị chặn: 401
-[PASS] H02 Có Basic Auth challenge: yes
-[PASS] H03 Sai mật khẩu bị chặn: 401
-[PASS] H04 Không lộ thông tin admin trên trang 401: no
-[PASS] H05 CSS trả thành công: 200
-[PASS] H06 JS trả thành công: 200
-[PASS] H07 Không MySQL driver không hiện dữ liệu giả: 503
-HTTP SMOKE: PASS=7 FAIL=0
