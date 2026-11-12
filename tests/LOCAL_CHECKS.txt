@@ -1,0 +1,35 @@
+KẾT QUẢ KIỂM TRA CÓ BẰNG CHỨNG — 2026-11-08
+
+Môi trường tại đây:
+- PHP 8.4.24 CLI (Debian 13)
+- KHÔNG có extension pdo_mysql, Docker và MySQL server.
+- Không có source code hoặc schema thật của nhóm.
+
+Đã thực thi trên môi trường tạo gói:
+- php -l trên toàn bộ 16 file PHP: PASS 16/16.
+- php tests/dashboard_unit_test.php: PASS 36/36 (PDO giả lập, KHÔNG phải MySQL thật).
+- php tests/view_test.php: PASS 5/5 (render dữ liệu test độc lập).
+- HTTP từ máy cục bộ với php -S:
+  + GET /dashboard.php không gửi Basic Auth -> HTTP 401
+  + GET /dashboard.php gửi sai Basic Auth -> HTTP 401
+  + GET /dashboard.php gửi đúng Basic Auth nhưng môi trường không có pdo_mysql -> HTTP 503
+  + GET /css/dashboard.css -> HTTP 200
+  + GET /js/dashboard.js -> HTTP 200
+- Python/PyYAML: 30/30 kiểm tra tĩnh về Compose/SQL demo/config/port/CSS đạt.
+- Bash HTTP smoke test: 7/7 PASS; khi disable demo, HTTP 404.
+- Node --check admin.js: PASS.
+- Đã sửa lỗi PDO silent-mode: execute()/fetchColumn() trả false không bị hiểu nhầm thành dữ liệu 0.
+
+Chưa chạy tại đây (KHÔNG ĐÁNH DẤU PASS):
+- tests/demo_database_test.php (truy vấn thật MySQL).
+- tests/run.php kết nối MySQL (AUTH/ART/CAT/COM read-only).
+- Test CRUD, đăng nhập/đăng xuất thật và các module thành viên khác.
+- Tích hợp Router/Auth/Admin Layout + source code nhánh GitHub nhóm.
+- docker compose up/build vì môi trường này thiếu Docker và MySQL.
+
+Cách kiểm chứng trên máy Windows có Docker:
+- Xem RUN_LOCAL_DEMO.md.
+- Không thay thế database của nhóm bằng database/demo_schema.sql.
+
+Có nội dung README NEWS HUB do người dùng gửi, nhưng chưa có source repo và file SQL của nhóm.
+Đọc TEST_REPORT_2026-11-08.md để xem trạng thái mới nhất.

@@ -1,0 +1,5 @@
+Chromium (Playwright, giao diện mẫu): PASS
+2026-11-11 - desktop viewport 1440x900: Dashboard heading / 5 cards / 5 articles / documentWidth=1440 / bodyWidth=1440: PASS
+2026-11-11 - mobile viewport 390x844: Dashboard heading / 5 cards / 5 articles / documentWidth=390 / bodyWidth=390: PASS
+HTML preview được tạo bởi php tests/fixtures/dashboard_preview.php.
+Dữ liệu giả lập (không phải MySQL thật). Hai PNG chỉ là ảnh minh chứng hiển thị giao diện độc lập; không phải giao diện NEWS HUB đang chạy.
