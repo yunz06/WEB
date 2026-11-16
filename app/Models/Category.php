@@ -1,35 +1,23 @@
 <?php
 
+require_once __DIR__ . '/../Core/Database.php';
+
 class Category {
     private $pdo;
 
     public function __construct($pdo = null) {
-        if ($pdo) {
-            $this->pdo = $pdo;
-        } else {
-            if (!class_exists('Database')) {
-                $dbPaths = [
-                    __DIR__ . '/../core/Database.php',
-                    __DIR__ . '/../config/Database.php'
-                ];
-                foreach ($dbPaths as $path) {
-                    if (file_exists($path)) {
-                        require_once $path;
-                        break;
-                    }
-                }
-            }
-            $db = new Database();
-            $this->pdo = $db->pdo;
-        }
+        $this->pdo = $pdo instanceof PDO
+            ? $pdo
+            : Database::getInstance()->getConnection();
     }
 
     // Lấy danh sách danh mục kèm số bài viết (phân trang)
     public function getAll($limit, $offset) {
-        $sql = "SELECT c.*, COUNT(a.id) AS article_count
+        $sql = "SELECT c.*,
+                       (SELECT COUNT(*)
+                        FROM articles a
+                        WHERE a.category_id = c.id) AS article_count
                 FROM categories c
-                LEFT JOIN articles a ON a.category_id = c.id
-                GROUP BY c.id
                 ORDER BY c.id DESC
                 LIMIT :limit OFFSET :offset";
         $stmt = $this->pdo->prepare($sql);

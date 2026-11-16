@@ -1,27 +1,14 @@
 <?php
 
+require_once __DIR__ . '/../Core/Database.php';
+
 class Article {
     private $pdo;
 
     public function __construct($pdo = null) {
-        if ($pdo) {
-            $this->pdo = $pdo;
-        } else {
-            if (!class_exists('Database')) {
-                $dbPaths = [
-                    __DIR__ . '/../core/Database.php',
-                    __DIR__ . '/../config/Database.php'
-                ];
-                foreach ($dbPaths as $path) {
-                    if (file_exists($path)) {
-                        require_once $path;
-                        break;
-                    }
-                }
-            }
-            $db = new Database();
-            $this->pdo = $db->pdo;
-        }
+        $this->pdo = $pdo instanceof PDO
+            ? $pdo
+            : Database::getInstance()->getConnection();
     }
 
     // Lấy danh sách bài viết cho trang Admin (kèm tên danh mục & phân trang)
