@@ -1,10 +1,12 @@
 <?php
+ob_start();
 $baseUrl         = $data['baseUrl'] ?? '';
 $categories      = $data['categories'] ?? [];
 $editCategory    = $data['editCategory'] ?? null;
 $page            = $data['page'] ?? 1;
 $totalPages      = $data['totalPages'] ?? 1;
 $totalCategories = $data['totalCategories'] ?? 0;
+$csrfToken       = $data['csrf_token'] ?? '';
 
 $formAction = $editCategory
     ? $baseUrl . '/CategoryController/update/' . $editCategory['id']
@@ -13,7 +15,6 @@ $formAction = $editCategory
 
 <!-- Admin header and sidebar can be added here when available. -->
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
     :root { --news-primary: #0f545a; }
 </style>
@@ -46,6 +47,7 @@ $formAction = $editCategory
         </div>
         <div class="card-body">
             <form action="<?= $formAction ?>" method="POST">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                 <div class="row g-3">
                     <div class="col-md-4">
                         <label for="name" class="form-label fw-semibold">Tên danh mục <span class="text-danger">*</span></label>
@@ -59,6 +61,15 @@ $formAction = $editCategory
                                value="<?= htmlspecialchars($editCategory['description'] ?? '') ?>"
                                placeholder="Mô tả ngắn về danh mục...">
                     </div>
+                </div>
+                <div class="row g-3 mt-1">
+                    <div class="col-md-4"><label class="form-label" for="parent_id">Danh mục cha</label>
+                        <select class="form-select" id="parent_id" name="parent_id"><option value="">Không có (danh mục chính)</option>
+                            <?php foreach (($data['parentCategories'] ?? []) as $parent): ?><option value="<?= (int)$parent['id'] ?>" <?= (int)($editCategory['parent_id'] ?? 0) === (int)$parent['id'] ? 'selected' : '' ?>><?= htmlspecialchars($parent['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></option><?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-4"><label class="form-label" for="sort_order">Thứ tự</label><input class="form-control" id="sort_order" name="sort_order" type="number" min="0" max="65535" value="<?= (int)($editCategory['sort_order'] ?? 0) ?>"></div>
+                    <div class="col-md-4"><label class="form-label" for="status">Trạng thái</label><select class="form-select" id="status" name="status"><option value="active" <?= ($editCategory['status'] ?? 'active') === 'active' ? 'selected' : '' ?>>Đang hoạt động</option><option value="inactive" <?= ($editCategory['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>Tạm ẩn</option></select></div>
                 </div>
                 <div class="mt-4">
                     <button type="submit" class="btn btn-primary px-4">
@@ -98,9 +109,12 @@ $formAction = $editCategory
                                 <td class="text-end">
                                     <a href="<?= $baseUrl ?>/CategoryController/edit/<?= $row['id'] ?>/<?= $page ?>"
                                        class="btn btn-sm btn-outline-primary">Sửa</a>
-                                    <a href="<?= $baseUrl ?>/CategoryController/delete/<?= $row['id'] ?>"
-                                       class="btn btn-sm btn-outline-danger"
-                                       onclick="return confirm('Bạn có chắc chắn muốn xóa danh mục này?')">Xóa</a>
+                                    <form method="POST" action="<?= $baseUrl ?>/CategoryController/delete/<?= (int)$row['id'] ?>"
+                                          class="d-inline"
+                                          onsubmit="return confirm('Bạn có chắc chắn muốn xóa danh mục này?')">
+                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
+                                    </form>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -129,5 +143,4 @@ $formAction = $editCategory
     </section>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<!-- Admin footer can be added here when available. -->
+<?php $pageContent = (string)ob_get_clean(); require __DIR__ . '/../layouts/admin.php'; ?>

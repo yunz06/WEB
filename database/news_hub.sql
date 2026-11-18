@@ -42,12 +42,23 @@ CREATE TABLE IF NOT EXISTS `users` (
 
 CREATE TABLE IF NOT EXISTS `categories` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `parent_id` INT UNSIGNED NULL DEFAULT NULL,
     `name` VARCHAR(100) NOT NULL,
     `slug` VARCHAR(255) NOT NULL,
     `description` TEXT NULL,
+    `sort_order` SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    `status` ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP NULL DEFAULT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_categories_name` (`name`),
-    UNIQUE KEY `uq_categories_slug` (`slug`)
+    UNIQUE KEY `uq_categories_slug` (`slug`),
+    KEY `idx_categories_parent_id` (`parent_id`),
+    KEY `idx_categories_status_sort_order` (`status`, `sort_order`),
+    CONSTRAINT `fk_categories_parent`
+        FOREIGN KEY (`parent_id`) REFERENCES `categories` (`id`)
+        ON DELETE RESTRICT
+        ON UPDATE RESTRICT
 ) ENGINE=InnoDB
   DEFAULT CHARACTER SET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
@@ -55,13 +66,15 @@ CREATE TABLE IF NOT EXISTS `categories` (
 CREATE TABLE IF NOT EXISTS `articles` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `category_id` INT UNSIGNED NOT NULL,
-    `user_id` INT UNSIGNED NULL DEFAULT NULL,
+    `user_id` INT UNSIGNED NOT NULL,
     `title` VARCHAR(255) NOT NULL,
     `slug` VARCHAR(255) NOT NULL,
     `summary` TEXT NULL,
     `content` LONGTEXT NOT NULL,
     `thumbnail` VARCHAR(255) NULL,
     `status` ENUM('draft', 'published') NOT NULL DEFAULT 'draft',
+    `is_featured` TINYINT(1) NOT NULL DEFAULT 0,
+    `published_at` TIMESTAMP NULL DEFAULT NULL,
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP NULL DEFAULT NULL,
     PRIMARY KEY (`id`),
@@ -69,6 +82,7 @@ CREATE TABLE IF NOT EXISTS `articles` (
     KEY `idx_articles_user_id` (`user_id`),
     KEY `idx_articles_status_created_at` (`status`, `created_at`),
     KEY `idx_articles_category_status_created_at` (`category_id`, `status`, `created_at`),
+    KEY `idx_articles_featured_published_at` (`status`, `is_featured`, `published_at`),
     CONSTRAINT `fk_articles_category`
         FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`)
         ON DELETE RESTRICT
@@ -85,6 +99,9 @@ CREATE TABLE IF NOT EXISTS `article_images` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `article_id` INT UNSIGNED NOT NULL,
     `image_path` VARCHAR(255) NOT NULL,
+    `caption` VARCHAR(255) NULL,
+    `alt_text` VARCHAR(255) NULL,
+    `sort_order` SMALLINT UNSIGNED NOT NULL DEFAULT 0,
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_article_images_article_id` (`article_id`),
@@ -107,6 +124,7 @@ CREATE TABLE IF NOT EXISTS `comments` (
     PRIMARY KEY (`id`),
     KEY `idx_comments_user_id` (`user_id`),
     KEY `idx_comments_article_status_created_at` (`article_id`, `status`, `created_at`),
+    KEY `idx_comments_status_created_at` (`status`, `created_at`),
     CONSTRAINT `fk_comments_article`
         FOREIGN KEY (`article_id`) REFERENCES `articles` (`id`)
         ON DELETE CASCADE

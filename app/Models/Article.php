@@ -1,170 +1,277 @@
 <?php
 
+declare(strict_types=1);
+
 require_once __DIR__ . '/../Core/Database.php';
 
-class Article {
-    private $pdo;
+class Article
+{
+    private PDO $pdo;
 
-    public function __construct($pdo = null) {
-        $this->pdo = $pdo instanceof PDO
-            ? $pdo
-            : Database::getInstance()->getConnection();
+    public function __construct(?PDO $pdo = null)
+    {
+        $this->pdo = $pdo ?? Database::getInstance()->getConnection();
     }
 
-    // Lấy danh sách bài viết cho trang Admin (kèm tên danh mục & phân trang)
-    public function getAllAdmin($limit, $offset) {
-        $sql = "SELECT a.*, c.name AS category_name 
-                FROM articles a 
-                LEFT JOIN categories c ON a.category_id = c.id 
-                ORDER BY a.created_at DESC 
-                LIMIT :limit OFFSET :offset";
+    public function getAllAdmin($limit, $offset, array $filters = []): array
+    {
+        $where = [];
+        $params = [];
+        if (!empty($filters['status']) && in_array($filters['status'], ['draft', 'published'], true)) {
+            $where[] = 'a.status = :status';
+            $params[':status'] = $filters['status'];
+        }
+        if (!empty($filters['category_id'])) {
+            $where[] = 'a.category_id = :category_id';
+            $params[':category_id'] = (int)$filters['category_id'];
+        }
+        if (!empty($filters['query'])) {
+            $where[] = '(a.title LIKE :title_query OR a.summary LIKE :summary_query)';
+            $params[':title_query'] = '%' . $filters['query'] . '%';
+            $params[':summary_query'] = '%' . $filters['query'] . '%';
+        }
+        $sql = 'SELECT a.*, c.name AS category_name, u.full_name AS author_name
+                FROM articles a LEFT JOIN categories c ON c.id = a.category_id
+                LEFT JOIN users u ON u.id = a.user_id';
+        if ($where !== []) $sql .= ' WHERE ' . implode(' AND ', $where);
+        $sql .= ' ORDER BY a.created_at DESC, a.id DESC LIMIT :limit OFFSET :offset';
         $stmt = $this->pdo->prepare($sql);
-        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->bindValue(':limit', max(1, (int)$limit), PDO::PARAM_INT);
+        $stmt->bindValue(':offset', max(0, (int)$offset), PDO::PARAM_INT);
         $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $stmt->fetchAll();
     }
 
-    // Đếm tổng số bài viết trong hệ thống
-    public function countAllAdmin() {
-        $stmt = $this->pdo->query("SELECT COUNT(*) FROM articles");
+    public function countAllAdmin(array $filters = []): int
+    {
+        [$where, $params] = $this->adminFilterSql($filters);
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM articles a' . ($where ? ' WHERE ' . $where : ''));
+        $stmt->execute($params);
         return (int)$stmt->fetchColumn();
     }
 
-    // Lấy danh sách bài viết ĐÃ XUẤT BẢN (published) cho trang User
-    public function getPublished($limit = 10, $offset = 0, $categoryId = null) {
-        $sql = "SELECT a.*, c.name AS category_name 
-                FROM articles a 
-                LEFT JOIN categories c ON a.category_id = c.id 
-                WHERE a.status = 'published'";
-        if ($categoryId) {
-            $sql .= " AND a.category_id = :category_id";
+    private function adminFilterSql(array $filters): array
+    {
+        $where = [];
+        $params = [];
+        if (!empty($filters['status']) && in_array($filters['status'], ['draft', 'published'], true)) {
+            $where[] = 'a.status = :status'; $params[':status'] = $filters['status'];
         }
-        $sql .= " ORDER BY a.created_at DESC LIMIT :limit OFFSET :offset";
-
-        $stmt = $this->pdo->prepare($sql);
-        if ($categoryId) {
-            $stmt->bindValue(':category_id', (int)$categoryId, PDO::PARAM_INT);
+        if (!empty($filters['category_id'])) {
+            $where[] = 'a.category_id = :category_id'; $params[':category_id'] = (int)$filters['category_id'];
         }
-        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (!empty($filters['query'])) {
+            $where[] = '(a.title LIKE :title_query OR a.summary LIKE :summary_query)';
+            $params[':title_query'] = '%' . $filters['query'] . '%'; $params[':summary_query'] = '%' . $filters['query'] . '%';
+        }
+        return [implode(' AND ', $where), $params];
     }
 
-    // Đếm tổng bài viết đã xuất bản
-    public function countPublished($categoryId = null) {
-        $sql = "SELECT COUNT(*) FROM articles WHERE status = 'published'";
-        if ($categoryId) {
-            $sql .= " AND category_id = :category_id";
-        }
+    public function countPublished($categoryId = null): int
+    {
+        $sql = "SELECT COUNT(*) FROM articles a JOIN categories c ON c.id=a.category_id
+                WHERE a.status='published' AND a.published_at IS NOT NULL AND a.published_at <= CURRENT_TIMESTAMP
+                AND c.status='active'
+                AND (c.parent_id IS NULL OR EXISTS (SELECT 1 FROM categories p WHERE p.id=c.parent_id AND p.status='active'))";
+        if ($categoryId !== null) $sql .= ' AND a.category_id = :category_id';
         $stmt = $this->pdo->prepare($sql);
-        if ($categoryId) {
-            $stmt->bindValue(':category_id', (int)$categoryId, PDO::PARAM_INT);
-        }
+        if ($categoryId !== null) $stmt->bindValue(':category_id', (int)$categoryId, PDO::PARAM_INT);
         $stmt->execute();
         return (int)$stmt->fetchColumn();
     }
 
-    // Lấy chi tiết 1 bài viết kèm danh sách ảnh phụ
-    public function getById($id) {
-        $sql = "SELECT a.*, c.name AS category_name 
-                FROM articles a 
-                LEFT JOIN categories c ON a.category_id = c.id 
-                WHERE a.id = :id";
+    public function getPublished($limit = 10, $offset = 0, $categoryId = null): array
+    {
+        $sql = "SELECT a.*, c.name AS category_name, c.slug AS category_slug, u.full_name AS author_name
+                FROM articles a JOIN categories c ON c.id=a.category_id LEFT JOIN users u ON u.id=a.user_id
+                WHERE a.status='published' AND a.published_at IS NOT NULL AND a.published_at <= CURRENT_TIMESTAMP
+                AND c.status='active'";
+        if ($categoryId !== null) $sql .= ' AND a.category_id = :category_id';
+        $sql .= ' ORDER BY a.published_at DESC, a.id DESC LIMIT :limit OFFSET :offset';
         $stmt = $this->pdo->prepare($sql);
-        $stmt->bindValue(':id', (int)$id, PDO::PARAM_INT);
+        if ($categoryId !== null) $stmt->bindValue(':category_id', (int)$categoryId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', max(1, min(100, (int)$limit)), PDO::PARAM_INT);
+        $stmt->bindValue(':offset', max(0, (int)$offset), PDO::PARAM_INT);
         $stmt->execute();
-        $article = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $stmt->fetchAll();
+    }
 
-        if ($article) {
-            $article['images'] = $this->getArticleImages($id);
-        }
+    public function getFeaturedPublished(int $limit = 6): array
+    {
+        $stmt = $this->pdo->prepare("SELECT a.*, c.name AS category_name, c.slug AS category_slug
+            FROM articles a JOIN categories c ON c.id=a.category_id
+            WHERE a.status='published' AND a.is_featured=1 AND a.published_at <= CURRENT_TIMESTAMP AND c.status='active'
+            AND (c.parent_id IS NULL OR EXISTS (SELECT 1 FROM categories p WHERE p.id=c.parent_id AND p.status='active'))
+            ORDER BY a.published_at DESC, a.id DESC LIMIT :limit");
+        $stmt->bindValue(':limit', max(1, min(20, $limit)), PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function getById($id): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT a.*, c.name AS category_name, c.slug AS category_slug, u.full_name AS author_name
+            FROM articles a LEFT JOIN categories c ON c.id=a.category_id LEFT JOIN users u ON u.id=a.user_id WHERE a.id=:id');
+        $stmt->execute([':id' => (int)$id]);
+        $article = $stmt->fetch();
+        if (!$article) return null;
+        $article['images'] = $this->getArticleImages((int)$id);
         return $article;
     }
 
-    // Lấy danh sách ảnh trong bảng article_images
-    public function getArticleImages($articleId) {
-        $stmt = $this->pdo->prepare("SELECT * FROM article_images WHERE article_id = :article_id");
-        $stmt->bindValue(':article_id', (int)$articleId, PDO::PARAM_INT);
+    public function getPublishedById($id): ?array
+    {
+        $stmt = $this->pdo->prepare("SELECT a.*, c.name AS category_name, c.slug AS category_slug, u.full_name AS author_name
+            FROM articles a JOIN categories c ON c.id=a.category_id LEFT JOIN users u ON u.id=a.user_id
+            WHERE a.id=:id AND a.status='published' AND a.published_at IS NOT NULL
+            AND a.published_at <= CURRENT_TIMESTAMP AND c.status='active'
+            AND (c.parent_id IS NULL OR EXISTS (SELECT 1 FROM categories p WHERE p.id=c.parent_id AND p.status='active')) LIMIT 1");
+        $stmt->execute([':id' => (int)$id]);
+        $article = $stmt->fetch();
+        if (!$article) return null;
+        $article['images'] = $this->getArticleImages((int)$id);
+        return $article;
+    }
+
+    public function getArticleImages($articleId): array
+    {
+        $stmt = $this->pdo->prepare('SELECT * FROM article_images WHERE article_id=:id ORDER BY sort_order, id');
+        $stmt->execute([':id' => (int)$articleId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getCategories(): array
+    {
+        return $this->pdo->query("SELECT c.id, c.name, c.slug, c.parent_id FROM categories c
+            WHERE c.status='active' AND (c.parent_id IS NULL OR EXISTS
+            (SELECT 1 FROM categories p WHERE p.id=c.parent_id AND p.status='active'))
+            ORDER BY c.parent_id IS NOT NULL, c.sort_order, c.name")->fetchAll();
+    }
+
+    public function searchPublished(string $query, int $limit = 10, int $offset = 0): array
+    {
+        $stmt = $this->pdo->prepare("SELECT a.*, c.name AS category_name, c.slug AS category_slug
+            FROM articles a JOIN categories c ON c.id=a.category_id
+            WHERE a.status='published' AND a.published_at IS NOT NULL AND a.published_at <= CURRENT_TIMESTAMP
+            AND c.status='active' AND (c.parent_id IS NULL OR EXISTS
+            (SELECT 1 FROM categories p WHERE p.id=c.parent_id AND p.status='active')) AND a.title LIKE :query
+            ORDER BY a.published_at DESC, a.id DESC LIMIT :limit OFFSET :offset");
+        $stmt->bindValue(':query', '%' . $query . '%');
+        $stmt->bindValue(':limit', max(1, min(100, $limit)), PDO::PARAM_INT);
+        $stmt->bindValue(':offset', max(0, $offset), PDO::PARAM_INT);
         $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $stmt->fetchAll();
     }
 
-    // Lấy danh sách danh mục từ bảng categories
-    public function getCategories() {
-        $stmt = $this->pdo->query("SELECT id, name FROM categories ORDER BY name ASC");
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    public function countSearchPublished(string $query): int
+    {
+        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM articles a JOIN categories c ON c.id=a.category_id
+            WHERE a.status='published' AND a.published_at IS NOT NULL AND a.published_at <= CURRENT_TIMESTAMP
+            AND c.status='active' AND (c.parent_id IS NULL OR EXISTS
+            (SELECT 1 FROM categories p WHERE p.id=c.parent_id AND p.status='active')) AND a.title LIKE :query");
+        $stmt->execute([':query' => '%' . $query . '%']);
+        return (int)$stmt->fetchColumn();
     }
 
-    // Thêm bài viết mới
-    public function create($data) {
-        $sql = "INSERT INTO articles (category_id, title, slug, summary, content, thumbnail, status) 
-                VALUES (:category_id, :title, :slug, :summary, :content, :thumbnail, :status)";
+    public function slugExists(string $slug, int $excludeId = 0): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT 1 FROM articles WHERE slug=:slug AND id<>:id LIMIT 1');
+        $stmt->execute([':slug' => $slug, ':id' => $excludeId]);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    public function create($data): int
+    {
+        $status = ($data['status'] ?? 'draft') === 'published' ? 'published' : 'draft';
+        $publishedAt = $status === 'published' ? ($data['published_at'] ?? date('Y-m-d H:i:s')) : null;
+        $stmt = $this->pdo->prepare('INSERT INTO articles
+            (category_id,user_id,title,slug,summary,content,thumbnail,status,is_featured,published_at)
+            VALUES (:category_id,:user_id,:title,:slug,:summary,:content,:thumbnail,:status,:is_featured,:published_at)');
+        $stmt->execute([
+            ':category_id' => (int)$data['category_id'], ':user_id' => (int)$data['user_id'],
+            ':title' => $data['title'], ':slug' => $data['slug'], ':summary' => $data['summary'] ?? null,
+            ':content' => $data['content'], ':thumbnail' => $data['thumbnail'] ?? null, ':status' => $status,
+            ':is_featured' => $status === 'published' ? (int)($data['is_featured'] ?? 0) : 0,
+            ':published_at' => $publishedAt,
+        ]);
+        return (int)$this->pdo->lastInsertId();
+    }
+
+    public function addArticleImage($articleId, $imagePath, ?string $caption = null, ?string $altText = null, int $sortOrder = 0): bool
+    {
+        $stmt = $this->pdo->prepare('INSERT INTO article_images (article_id,image_path,caption,alt_text,sort_order)
+            VALUES (:article_id,:image_path,:caption,:alt_text,:sort_order)');
+        return $stmt->execute([':article_id' => (int)$articleId, ':image_path' => $imagePath,
+            ':caption' => $caption, ':alt_text' => $altText, ':sort_order' => $sortOrder]);
+    }
+
+    public function update($id, $data): bool
+    {
+        $status = ($data['status'] ?? 'draft') === 'published' ? 'published' : 'draft';
+        $publishedAt = $status === 'published' ? ($data['published_at'] ?? date('Y-m-d H:i:s')) : null;
+        $stmt = $this->pdo->prepare('UPDATE articles SET category_id=:category_id,title=:title,slug=:slug,
+            summary=:summary,content=:content,thumbnail=:thumbnail,status=:status,is_featured=:is_featured,
+            published_at=:published_at,updated_at=CURRENT_TIMESTAMP WHERE id=:id');
+        return $stmt->execute([
+            ':id' => (int)$id, ':category_id' => (int)$data['category_id'], ':title' => $data['title'],
+            ':slug' => $data['slug'], ':summary' => $data['summary'] ?? null, ':content' => $data['content'],
+            ':thumbnail' => $data['thumbnail'] ?? null, ':status' => $status,
+            ':is_featured' => $status === 'published' ? (int)($data['is_featured'] ?? 0) : 0,
+            ':published_at' => $publishedAt,
+        ]);
+    }
+
+    public function delete($id): bool
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM articles WHERE id=:id');
+        return $stmt->execute([':id' => (int)$id]);
+    }
+
+    public function deleteArticleImage($imageId, ?int $articleId = null)
+    {
+        $sql = 'SELECT image_path FROM article_images WHERE id=:id';
+        if ($articleId !== null) $sql .= ' AND article_id=:article_id';
         $stmt = $this->pdo->prepare($sql);
-        $stmt->bindValue(':category_id', (int)$data['category_id'], PDO::PARAM_INT);
-        $stmt->bindValue(':title', $data['title'], PDO::PARAM_STR);
-        $stmt->bindValue(':slug', $data['slug'], PDO::PARAM_STR);
-        $stmt->bindValue(':summary', $data['summary'], PDO::PARAM_STR);
-        $stmt->bindValue(':content', $data['content'], PDO::PARAM_STR);
-        $stmt->bindValue(':thumbnail', $data['thumbnail'], PDO::PARAM_STR);
-        $stmt->bindValue(':status', $data['status'], PDO::PARAM_STR);
-        $stmt->execute();
-        return $this->pdo->lastInsertId();
+        $params = [':id' => (int)$imageId];
+        if ($articleId !== null) $params[':article_id'] = $articleId;
+        $stmt->execute($params);
+        $image = $stmt->fetch();
+        if (!$image) return false;
+        $deleteSql = 'DELETE FROM article_images WHERE id=:id';
+        if ($articleId !== null) $deleteSql .= ' AND article_id=:article_id';
+        $delete = $this->pdo->prepare($deleteSql);
+        $delete->execute($params);
+        return $image['image_path'];
     }
 
-    // Lưu từng ảnh vào bảng article_images
-    public function addArticleImage($articleId, $imagePath) {
-        $sql = "INSERT INTO article_images (article_id, image_path) VALUES (:article_id, :image_path)";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->bindValue(':article_id', (int)$articleId, PDO::PARAM_INT);
-        $stmt->bindValue(':image_path', $imagePath, PDO::PARAM_STR);
-        return $stmt->execute();
+    public function fileIsReferenced(string $path): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT 1 FROM articles WHERE thumbnail=:thumb
+            UNION ALL SELECT 1 FROM article_images WHERE image_path=:image LIMIT 1');
+        $stmt->execute([':thumb' => $path, ':image' => $path]);
+        return (bool)$stmt->fetchColumn();
     }
 
-    // Cập nhật bài viết
-    public function update($id, $data) {
-        $sql = "UPDATE articles SET 
-                    category_id = :category_id,
-                    title = :title,
-                    slug = :slug,
-                    summary = :summary,
-                    content = :content,
-                    thumbnail = :thumbnail,
-                    status = :status
-                WHERE id = :id";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->bindValue(':id', (int)$id, PDO::PARAM_INT);
-        $stmt->bindValue(':category_id', (int)$data['category_id'], PDO::PARAM_INT);
-        $stmt->bindValue(':title', $data['title'], PDO::PARAM_STR);
-        $stmt->bindValue(':slug', $data['slug'], PDO::PARAM_STR);
-        $stmt->bindValue(':summary', $data['summary'], PDO::PARAM_STR);
-        $stmt->bindValue(':content', $data['content'], PDO::PARAM_STR);
-        $stmt->bindValue(':thumbnail', $data['thumbnail'], PDO::PARAM_STR);
-        $stmt->bindValue(':status', $data['status'], PDO::PARAM_STR);
-        return $stmt->execute();
-    }
-
-    // Xóa bài viết
-    public function delete($id) {
-        $stmt = $this->pdo->prepare("DELETE FROM articles WHERE id = :id");
-        $stmt->bindValue(':id', (int)$id, PDO::PARAM_INT);
-        return $stmt->execute();
-    }
-
-    // Xóa 1 ảnh phụ và trả về tên file để xóa trên ổ cứng
-    public function deleteArticleImage($imageId) {
-        $stmt = $this->pdo->prepare("SELECT image_path FROM article_images WHERE id = :id");
-        $stmt->bindValue(':id', (int)$imageId, PDO::PARAM_INT);
-        $stmt->execute();
-        $img = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($img) {
-            $delStmt = $this->pdo->prepare("DELETE FROM article_images WHERE id = :id");
-            $delStmt->bindValue(':id', (int)$imageId, PDO::PARAM_INT);
-            $delStmt->execute();
-            return $img['image_path'];
+    public function updateImageOrder(int $articleId, array $imageIds): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE article_images SET sort_order=:sort WHERE id=:id AND article_id=:article');
+        foreach (array_values($imageIds) as $order => $imageId) {
+            $stmt->execute([':sort' => $order, ':id' => (int)$imageId, ':article' => $articleId]);
         }
-        return false;
+    }
+
+    public function getDashboardStats(): array
+    {
+        return [
+            'articles' => (int)$this->pdo->query('SELECT COUNT(*) FROM articles')->fetchColumn(),
+            'published' => (int)$this->pdo->query("SELECT COUNT(*) FROM articles WHERE status='published' AND published_at<=CURRENT_TIMESTAMP")->fetchColumn(),
+            'drafts' => (int)$this->pdo->query("SELECT COUNT(*) FROM articles WHERE status='draft'")->fetchColumn(),
+            'categories' => (int)$this->pdo->query('SELECT COUNT(*) FROM categories')->fetchColumn(),
+            'users' => (int)$this->pdo->query('SELECT COUNT(*) FROM users')->fetchColumn(),
+            'pending_comments' => (int)$this->pdo->query("SELECT COUNT(*) FROM comments WHERE status='pending'")->fetchColumn(),
+        ];
     }
 }

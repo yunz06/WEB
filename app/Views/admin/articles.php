@@ -1,4 +1,5 @@
 <?php
+ob_start();
 // Lấy dữ liệu từ mảng $data do Controller truyền sang
 $baseUrl       = $data['baseUrl'] ?? '';
 $articles      = $data['articles'] ?? [];
@@ -7,6 +8,9 @@ $editArticle   = $data['editArticle'] ?? null;
 $page          = $data['page'] ?? 1;
 $totalPages    = $data['totalPages'] ?? 1;
 $totalArticles = $data['totalArticles'] ?? 0;
+$csrfToken     = $data['csrf_token'] ?? '';
+$filters       = $data['filters'] ?? [];
+$filterQuery   = http_build_query(array_filter(['q' => $filters['query'] ?? '', 'status' => $filters['status'] ?? '', 'category_id' => $filters['category_id'] ?? null], static fn($v) => $v !== '' && $v !== null));
 
 $formAction = $editArticle
     ? $baseUrl . '/ArticleController/update/' . $editArticle['id']
@@ -16,7 +20,6 @@ $formAction = $editArticle
 <!-- Nhúng Admin Header / Sidebar của TV1 tại đây nếu có -->
 <!-- Admin header and sidebar can be added here when available. -->
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <!-- Thư viện jQuery & TinyMCE  -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.8.3/tinymce.min.js"></script>
@@ -77,6 +80,7 @@ $formAction = $editArticle
         </div>
         <div class="card-body">
             <form id="articleForm" action="<?= $formAction ?>" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                 <div class="row g-3">
                     <!-- Tiêu đề -->
                     <div class="col-md-8">
@@ -84,6 +88,10 @@ $formAction = $editArticle
                         <input type="text" id="title" name="title" class="form-control" required
                                value="<?= htmlspecialchars($editArticle['title'] ?? '') ?>"
                                placeholder="Nhập tiêu đề bài báo...">
+                    </div>
+
+                    <div class="col-md-4"><label class="form-label" for="slug">Slug tùy chỉnh</label>
+                        <input class="form-control" id="slug" name="slug" maxlength="255" value="<?= htmlspecialchars($editArticle['slug'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>" placeholder="Để trống để tự tạo từ tiêu đề">
                     </div>
 
                     <!-- Danh mục -->
@@ -110,7 +118,7 @@ $formAction = $editArticle
                     <!-- Nội dung chi tiết tích hợp TinyMCE -->
                     <div class="col-12">
                         <label for="editor" class="form-label fw-semibold">Nội dung bài viết <span class="text-danger">*</span></label>
-                        <textarea id="editor" name="content"><?= $editArticle['content'] ?? '' ?></textarea>
+                        <textarea id="editor" name="content"><?= htmlspecialchars($editArticle['content'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></textarea>
                     </div>
 
                     <!-- Upload Ảnh đại diện -->
@@ -119,7 +127,7 @@ $formAction = $editArticle
                         <input type="file" id="thumbnail" name="thumbnail" class="form-control" accept="image/*">
                         <div id="thumbnailPreview" class="mt-2">
                             <?php if (!empty($editArticle['thumbnail'])): ?>
-                                <img src="<?= $baseUrl ?>/uploads/articles/<?= htmlspecialchars($editArticle['thumbnail']) ?>"
+                                <img src="<?= $baseUrl ?>/public/uploads/articles/<?= rawurlencode(basename($editArticle['thumbnail'])) ?>"
                                      alt="Thumbnail" class="img-thumbnail" style="max-height: 90px;">
                             <?php endif; ?>
                         </div>
@@ -138,10 +146,16 @@ $formAction = $editArticle
                             <div class="preview-grid">
                                 <?php foreach ($editArticle['images'] as $img): ?>
                                     <div class="position-relative">
-                                        <img src="<?= $baseUrl ?>/uploads/articles/<?= htmlspecialchars($img['image_path']) ?>" alt="Ảnh phụ">
-                                        <a href="<?= $baseUrl ?>/ArticleController/deleteImage/<?= $img['id'] ?>/<?= $editArticle['id'] ?>"
-                                           class="badge bg-danger text-decoration-none position-absolute top-0 end-0"
-                                           onclick="return confirm('Xóa ảnh này khỏi bài viết?')">×</a>
+                                        <img src="<?= $baseUrl ?>/public/uploads/articles/<?= rawurlencode(basename($img['image_path'])) ?>" alt="<?= htmlspecialchars($img['alt_text'] ?? 'Ảnh phụ', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
+                                        <label class="visually-hidden" for="image-order-<?= (int)$img['id'] ?>">Thứ tự ảnh</label>
+                                        <input class="form-control form-control-sm mt-1" id="image-order-<?= (int)$img['id'] ?>" type="number" min="0" name="image_order[<?= (int)$img['id'] ?>]" value="<?= (int)($img['sort_order'] ?? 0) ?>">
+                                        <button type="submit"
+                                                formaction="<?= $baseUrl ?>/ArticleController/deleteImage/<?= (int)$img['id'] ?>/<?= (int)$editArticle['id'] ?>"
+                                                formmethod="POST"
+                                                formenctype="application/x-www-form-urlencoded"
+                                                class="badge bg-danger border-0 position-absolute top-0 end-0"
+                                                aria-label="Xóa ảnh phụ"
+                                                onclick="return confirm('Xóa ảnh này khỏi bài viết?')">×</button>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -155,6 +169,10 @@ $formAction = $editArticle
                             <option value="draft" <?= (($editArticle['status'] ?? '') === 'draft') ? 'selected' : '' ?>>Draft (Bản nháp - Ẩn)</option>
                             <option value="published" <?= (($editArticle['status'] ?? '') === 'published') ? 'selected' : '' ?>>Published (Xuất bản công khai)</option>
                         </select>
+                    </div>
+                    <div class="col-md-3 form-check ms-2 align-self-end mb-2">
+                        <input class="form-check-input" type="checkbox" id="is_featured" name="is_featured" value="1" <?= !empty($editArticle['is_featured']) ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="is_featured">Tin nổi bật (chỉ hiện khi xuất bản)</label>
                     </div>
                 </div>
 
@@ -172,6 +190,12 @@ $formAction = $editArticle
         <div class="card-header bg-light fw-bold">
             Danh sách bài viết (Tổng cộng: <?= $totalArticles ?> bài)
         </div>
+        <form class="row g-2 p-3" method="get" action="<?= htmlspecialchars($baseUrl . '/ArticleController/index', ENT_QUOTES, 'UTF-8') ?>">
+            <div class="col-md-5"><label class="visually-hidden" for="article-query">Tìm bài</label><input class="form-control" id="article-query" name="q" value="<?= htmlspecialchars($filters['query'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>" placeholder="Tìm tiêu đề"></div>
+            <div class="col-md-3"><label class="visually-hidden" for="article-status-filter">Lọc trạng thái</label><select class="form-select" id="article-status-filter" name="status"><option value="">Mọi trạng thái</option><option value="draft" <?= ($filters['status'] ?? '') === 'draft' ? 'selected' : '' ?>>Bản nháp</option><option value="published" <?= ($filters['status'] ?? '') === 'published' ? 'selected' : '' ?>>Đã xuất bản</option></select></div>
+            <div class="col-md-3"><label class="visually-hidden" for="article-category-filter">Lọc danh mục</label><select class="form-select" id="article-category-filter" name="category_id"><option value="">Mọi danh mục</option><?php foreach ($categories as $category): ?><option value="<?= (int)$category['id'] ?>" <?= (int)($filters['category_id'] ?? 0) === (int)$category['id'] ? 'selected' : '' ?>><?= htmlspecialchars($category['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></option><?php endforeach; ?></select></div>
+            <div class="col-md-1"><button class="btn btn-outline-primary w-100">Lọc</button></div>
+        </form>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
@@ -196,7 +220,7 @@ $formAction = $editArticle
                                 <td>#<?= $row['id'] ?></td>
                                 <td>
                                     <?php if (!empty($row['thumbnail'])): ?>
-                                        <img src="<?= $baseUrl ?>/uploads/articles/<?= htmlspecialchars($row['thumbnail']) ?>"
+                                        <img src="<?= $baseUrl ?>/public/uploads/articles/<?= rawurlencode(basename($row['thumbnail'])) ?>"
                                              style="width: 64px; height: 44px; object-fit: cover;" class="rounded" alt="Thumb">
                                     <?php else: ?>
                                         <span class="badge bg-secondary">No Image</span>
@@ -221,9 +245,12 @@ $formAction = $editArticle
                                 <td class="text-end">
                                     <a href="<?= $baseUrl ?>/ArticleController/edit/<?= $row['id'] ?>/<?= $page ?>"
                                        class="btn btn-sm btn-outline-primary">Sửa</a>
-                                    <a href="<?= $baseUrl ?>/ArticleController/delete/<?= $row['id'] ?>"
-                                       class="btn btn-sm btn-outline-danger"
-                                       onclick="return confirm('Bạn có chắc chắn muốn xóa bài viết này?')">Xóa</a>
+                                    <form method="POST" action="<?= $baseUrl ?>/ArticleController/delete/<?= (int)$row['id'] ?>"
+                                          class="d-inline"
+                                          onsubmit="return confirm('Bạn có chắc chắn muốn xóa bài viết này?')">
+                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
+                                    </form>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -237,15 +264,15 @@ $formAction = $editArticle
             <nav class="card-footer d-flex justify-content-center">
                 <ul class="pagination mb-0">
                     <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
-                        <a class="page-link" href="<?= $baseUrl ?>/ArticleController/index/<?= $page - 1 ?>">Trước</a>
+                        <a class="page-link" href="<?= $baseUrl ?>/ArticleController/index/<?= $page - 1 ?><?= $filterQuery !== '' ? '?' . htmlspecialchars($filterQuery, ENT_QUOTES, 'UTF-8') : '' ?>">Trước</a>
                     </li>
                     <?php for ($i = 1; $i <= $totalPages; $i++): ?>
                         <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
-                            <a class="page-link" href="<?= $baseUrl ?>/ArticleController/index/<?= $i ?>"><?= $i ?></a>
+                            <a class="page-link" href="<?= $baseUrl ?>/ArticleController/index/<?= $i ?><?= $filterQuery !== '' ? '?' . htmlspecialchars($filterQuery, ENT_QUOTES, 'UTF-8') : '' ?>"><?= $i ?></a>
                         </li>
                     <?php endfor; ?>
                     <li class="page-item <?= ($page >= $totalPages) ? 'disabled' : '' ?>">
-                        <a class="page-link" href="<?= $baseUrl ?>/ArticleController/index/<?= $page + 1 ?>">Sau</a>
+                        <a class="page-link" href="<?= $baseUrl ?>/ArticleController/index/<?= $page + 1 ?><?= $filterQuery !== '' ? '?' . htmlspecialchars($filterQuery, ENT_QUOTES, 'UTF-8') : '' ?>">Sau</a>
                     </li>
                 </ul>
             </nav>
@@ -305,4 +332,4 @@ $formAction = $editArticle
 </script>
 
 <!-- Nhúng Admin Footer của TV1 tại đây nếu có -->
-<!-- Admin footer can be added here when available. -->
+<?php $pageContent = (string)ob_get_clean(); require __DIR__ . '/../layouts/admin.php'; ?>

@@ -4,6 +4,11 @@ RewriteEngine On
 Options -MultiViews
 DirectoryIndex index.php
 
+# Keep application source, configuration, database scripts, tests, and metadata private.
+RewriteRule ^(app|config|database|tests|docs|\.git|\.agents)(/|$) - [F,L,NC]
+RewriteRule (^|/)\. - [F,L]
+RewriteRule \.(sql|bak|log)$ - [F,L,NC]
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.php [QSA,L]
+RewriteRule ^ index.php [QSA,END]

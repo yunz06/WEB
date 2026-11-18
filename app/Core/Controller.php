@@ -6,6 +6,35 @@ require_once __DIR__ . '/Database.php';
 
 abstract class Controller
 {
+    protected function csrfToken(): string
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            throw new RuntimeException('Session is not active.');
+        }
+
+        $token = $_SESSION['csrf_token'] ?? null;
+        if (!is_string($token) || !preg_match('/\A[a-f0-9]{64}\z/', $token)) {
+            $token = bin2hex(random_bytes(32));
+            $_SESSION['csrf_token'] = $token;
+        }
+
+        return $token;
+    }
+
+    public static function csrfTokenIsValid($submittedToken): bool
+    {
+        $expectedToken = $_SESSION['csrf_token'] ?? null;
+
+        if (!is_string($expectedToken)
+            || !is_string($submittedToken)
+            || !preg_match('/\A[a-f0-9]{64}\z/', $expectedToken)
+            || !preg_match('/\A[a-f0-9]{64}\z/', $submittedToken)) {
+            return false;
+        }
+
+        return hash_equals($expectedToken, $submittedToken);
+    }
+
     protected function model(string $modelName)
     {
         if (!preg_match('/\A[A-Za-z][A-Za-z0-9]*\z/', $modelName)) {

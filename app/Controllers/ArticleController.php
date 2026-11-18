@@ -1,284 +1,229 @@
 <?php
 
-class ArticleController extends Controller {
-    private $articleModel;
-    private $uploadDir;
-    private $baseUrl;
+declare(strict_types=1);
 
-    public function __construct() {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+class ArticleController extends Controller
+{
+    private Article $articleModel;
+    private Category $categoryModel;
+    private PDO $pdo;
+    private string $uploadDir;
+    private string $baseUrl;
 
-        // Gọi Model theo chuẩn lớp cơ sở Controller 
+    public function __construct()
+    {
         $this->articleModel = $this->model('Article');
-
-        // Thư mục lưu ảnh vật lý: public/uploads/articles/
-        $this->uploadDir = __DIR__ . '/../../public/uploads/articles/';
-        if (!is_dir($this->uploadDir)) {
-            mkdir($this->uploadDir, 0755, true);
-        }
-
-        // Tự động xác định Base URL
-        $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME']));
-        $this->baseUrl = rtrim($scriptDir, '/');
+        $this->categoryModel = $this->model('Category');
+        $this->pdo = Database::getInstance()->getConnection();
+        $this->uploadDir = dirname(__DIR__, 2) . '/public/uploads/articles';
+        $this->baseUrl = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/index.php')), '/');
     }
 
-    // URL mặc định: /ArticleController/index/1
-    public function index($page = 1) {
-        $limit = 8;
-        $page = is_numeric($page) && (int)$page > 0 ? (int)$page : 1;
-        $offset = ($page - 1) * $limit;
-
-        $articles = $this->articleModel->getAllAdmin($limit, $offset);
-        $totalArticles = $this->articleModel->countAllAdmin();
-        $totalPages = max(1, ceil($totalArticles / $limit));
-        $categories = $this->articleModel->getCategories();
-
-        // Truyền dữ liệu sang View thông qua mảng $data
-        $this->view('admin/articles', [
-            'page_title'    => 'Quản lý bài viết - NEWS HUB',
-            'baseUrl'       => $this->baseUrl,
-            'articles'      => $articles,
-            'categories'    => $categories,
-            'editArticle'   => null,
-            'page'          => $page,
-            'totalPages'    => $totalPages,
-            'totalArticles' => $totalArticles
-        ]);
+    public function index(int $page = 1): void
+    {
+        $statusInput = $_GET['status'] ?? '';
+        $queryInput = $_GET['q'] ?? '';
+        $filters = ['status' => is_string($statusInput) ? $statusInput : '', 'query' => is_string($queryInput) ? trim($queryInput) : '',
+            'category_id' => filter_var($_GET['category_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: null];
+        if (mb_strlen($filters['query'], 'UTF-8') > 100) $filters['query'] = mb_substr($filters['query'], 0, 100, 'UTF-8');
+        $limit = 10; $page = max(1, $page); $total = $this->articleModel->countAllAdmin($filters);
+        $this->renderList($page, null, $filters, $total, $limit);
     }
 
-    // URL mở form sửa: /ArticleController/edit/{id}/{page}
-    public function edit($id = 0, $page = 1) {
-        $id = (int)$id;
-        $editArticle = $this->articleModel->getById($id);
-
-        if (!$editArticle) {
-            $_SESSION['error'] = "Không tìm thấy bài viết #$id!";
-            $this->redirect('/ArticleController/index');
-        }
-
-        $limit = 8;
-        $page = is_numeric($page) && (int)$page > 0 ? (int)$page : 1;
-        $offset = ($page - 1) * $limit;
-
-        $articles = $this->articleModel->getAllAdmin($limit, $offset);
-        $totalArticles = $this->articleModel->countAllAdmin();
-        $totalPages = max(1, ceil($totalArticles / $limit));
-        $categories = $this->articleModel->getCategories();
-
-        $this->view('admin/articles', [
-            'page_title'    => 'Chỉnh sửa bài viết #' . $id,
-            'baseUrl'       => $this->baseUrl,
-            'articles'      => $articles,
-            'categories'    => $categories,
-            'editArticle'   => $editArticle,
-            'page'          => $page,
-            'totalPages'    => $totalPages,
-            'totalArticles' => $totalArticles
-        ]);
-    }
-
-    // URL lưu bài viết mới (POST): /ArticleController/store
-    public function store() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $this->redirect('/ArticleController/index');
-        }
-
-        $title      = trim($_POST['title'] ?? '');
-        $categoryId = (int)($_POST['category_id'] ?? 0);
-        $summary    = trim($_POST['summary'] ?? '');
-        $content    = $_POST['content'] ?? '';
-        $status     = in_array($_POST['status'] ?? '', ['draft', 'published']) ? $_POST['status'] : 'draft';
-
-        if (empty($title) || empty($content) || $categoryId <= 0) {
-            $_SESSION['error'] = "Vui lòng nhập đầy đủ Tiêu đề, Danh mục và Nội dung!";
-            $this->redirect('/ArticleController/index');
-        }
-
-        // Xử lý upload ảnh đại diện (thumbnail)
-        $thumbnailName = null;
-        if (isset($_FILES['thumbnail']) && $_FILES['thumbnail']['error'] === UPLOAD_ERR_OK) {
-            $uploadResult = $this->uploadSingleFile($_FILES['thumbnail']);
-            if ($uploadResult['success']) {
-                $thumbnailName = $uploadResult['filename'];
-            } else {
-                $_SESSION['error'] = $uploadResult['message'];
-                $this->redirect('/ArticleController/index');
-            }
-        }
-
-        $articleId = $this->articleModel->create([
-            'category_id' => $categoryId,
-            'title'       => $title,
-            'slug'        => $this->createSlug($title),
-            'summary'     => $summary,
-            'content'     => $content,
-            'thumbnail'   => $thumbnailName,
-            'status'      => $status
-        ]);
-
-        // Xử lý upload nhiều ảnh phụ (images[])
-        if ($articleId && isset($_FILES['images']) && !empty($_FILES['images']['name'][0])) {
-            $this->handleMultipleUploads($articleId, $_FILES['images']);
-        }
-
-        $_SESSION['success'] = "Thêm bài viết thành công!";
-        $this->redirect('/ArticleController/index');
-    }
-
-    // URL cập nhật bài viết (POST): /ArticleController/update/{id}
-    public function update($id = 0) {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $this->redirect('/ArticleController/index');
-        }
-
-        $id = (int)$id;
-        $existingArticle = $this->articleModel->getById($id);
-        if (!$existingArticle) {
-            $_SESSION['error'] = "Bài viết không tồn tại!";
-            $this->redirect('/ArticleController/index');
-        }
-
-        $title      = trim($_POST['title'] ?? '');
-        $categoryId = (int)($_POST['category_id'] ?? 0);
-        $summary    = trim($_POST['summary'] ?? '');
-        $content    = $_POST['content'] ?? '';
-        $status     = in_array($_POST['status'] ?? '', ['draft', 'published']) ? $_POST['status'] : 'draft';
-
-        $thumbnailName = $existingArticle['thumbnail'];
-
-        // Nếu có upload ảnh đại diện mới
-        if (isset($_FILES['thumbnail']) && $_FILES['thumbnail']['error'] === UPLOAD_ERR_OK) {
-            $uploadResult = $this->uploadSingleFile($_FILES['thumbnail']);
-            if ($uploadResult['success']) {
-                if ($thumbnailName && file_exists($this->uploadDir . $thumbnailName)) {
-                    unlink($this->uploadDir . $thumbnailName);
-                }
-                $thumbnailName = $uploadResult['filename'];
-            } else {
-                $_SESSION['error'] = $uploadResult['message'];
-                $this->redirect('/ArticleController/edit/' . $id);
-            }
-        }
-
-        $this->articleModel->update($id, [
-            'category_id' => $categoryId,
-            'title'       => $title,
-            'slug'        => $this->createSlug($title),
-            'summary'     => $summary,
-            'content'     => $content,
-            'thumbnail'   => $thumbnailName,
-            'status'      => $status
-        ]);
-
-        // Upload thêm nhiều ảnh phụ nếu người dùng chọn thêm
-        if (isset($_FILES['images']) && !empty($_FILES['images']['name'][0])) {
-            $this->handleMultipleUploads($id, $_FILES['images']);
-        }
-
-        $_SESSION['success'] = "Cập nhật bài viết #$id thành công!";
-        $this->redirect('/ArticleController/index');
-    }
-
-    // URL xóa bài viết: /ArticleController/delete/{id}
-    public function delete($id = 0) {
-        $id = (int)$id;
+    public function edit(int $id, int $page = 1): void
+    {
         $article = $this->articleModel->getById($id);
+        if (!$article) { http_response_code(404); return; }
+        $this->renderList(max(1, $page), $article, [], $this->articleModel->countAllAdmin(), 10);
+    }
 
-        if ($article) {
-            if (!empty($article['thumbnail']) && file_exists($this->uploadDir . $article['thumbnail'])) {
-                unlink($this->uploadDir . $article['thumbnail']);
-            }
-            if (!empty($article['images'])) {
-                foreach ($article['images'] as $img) {
-                    if (file_exists($this->uploadDir . $img['image_path'])) {
-                        unlink($this->uploadDir . $img['image_path']);
-                    }
-                }
-            }
-            $this->articleModel->delete($id);
-            $_SESSION['success'] = "Đã xóa bài viết #$id!";
+    public function store(): void
+    {
+        $data = $this->validatedInput();
+        $data['slug'] = $this->uniqueSlug($data['slug'] !== '' ? $data['slug'] : $data['title']);
+        $data['user_id'] = (int)$_SESSION['user']['id'];
+        $files = [];
+        try {
+            $thumbnail = $this->uploadOne($_FILES['thumbnail'] ?? null);
+            if ($thumbnail !== null) { $files[] = $thumbnail; $data['thumbnail'] = basename($thumbnail); }
+            $gallery = $this->uploadMany($_FILES['images'] ?? null);
+            $files = array_merge($files, $gallery);
+            $this->pdo->beginTransaction();
+            $id = $this->articleModel->create($data);
+            foreach ($gallery as $order => $path) $this->articleModel->addArticleImage($id, basename($path), null, $data['title'], $order);
+            $this->pdo->commit();
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            $this->deleteFiles($files);
+            throw $e;
         }
+        $this->redirect('/ArticleController/edit/' . $id);
+    }
 
+    public function update(int $id): void
+    {
+        $old = $this->articleModel->getById($id);
+        if (!$old) { http_response_code(404); return; }
+        $data = $this->validatedInput();
+        $data['slug'] = $this->uniqueSlug($data['slug'] !== '' ? $data['slug'] : $data['title'], $id);
+        $data['user_id'] = (int)$old['user_id'];
+        $data['published_at'] = $data['status'] === 'published'
+            ? (($old['status'] === 'published' && !empty($old['published_at'])) ? $old['published_at'] : date('Y-m-d H:i:s'))
+            : null;
+        $oldThumbnail = $old['thumbnail'];
+        $files = [];
+        try {
+            $thumbnail = $this->uploadOne($_FILES['thumbnail'] ?? null);
+            $data['thumbnail'] = $thumbnail === null ? $oldThumbnail : basename($thumbnail);
+            if ($thumbnail !== null) $files[] = $thumbnail;
+            $gallery = $this->uploadMany($_FILES['images'] ?? null);
+            $files = array_merge($files, $gallery);
+            $this->pdo->beginTransaction();
+            $this->articleModel->update($id, $data);
+            $imageOrder = $_POST['image_order'] ?? [];
+            if (is_array($imageOrder)) {
+                asort($imageOrder, SORT_NUMERIC);
+                $this->articleModel->updateImageOrder($id, array_map('intval', array_keys($imageOrder)));
+            }
+            foreach ($gallery as $order => $path) $this->articleModel->addArticleImage($id, basename($path), null, $data['title'], $order);
+            $this->pdo->commit();
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            $this->deleteFiles($files);
+            throw $e;
+        }
+        if ($thumbnail !== null && $oldThumbnail) $this->deleteIfUnreferenced((string)$oldThumbnail);
+        $this->redirect('/ArticleController/edit/' . $id);
+    }
+
+    public function delete(int $id): void
+    {
+        $article = $this->articleModel->getById($id);
+        if ($article) {
+            $paths = array_column($article['images'] ?? [], 'image_path');
+            if (!empty($article['thumbnail'])) $paths[] = $article['thumbnail'];
+            $this->articleModel->delete($id);
+            foreach (array_unique($paths) as $path) $this->deleteIfUnreferenced((string)$path);
+        }
         $this->redirect('/ArticleController/index');
     }
 
-    // URL xóa 1 ảnh phụ: /ArticleController/deleteImage/{imageId}/{articleId}
-    public function deleteImage($imageId = 0, $articleId = 0) {
-        $filePath = $this->articleModel->deleteArticleImage((int)$imageId);
-        if ($filePath && file_exists($this->uploadDir . $filePath)) {
-            unlink($this->uploadDir . $filePath);
-        }
-        $this->redirect('/ArticleController/edit/' . (int)$articleId);
+    public function deleteImage(int $imageId, int $articleId): void
+    {
+        $path = $this->articleModel->deleteArticleImage($imageId, $articleId);
+        if ($path) $this->deleteIfUnreferenced((string)$path);
+        $this->redirect('/ArticleController/edit/' . $articleId);
     }
 
-    // Kiểm tra định dạng, dung lượng và đổi tên file an toàn
-    private function uploadSingleFile($file) {
-        $allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-        $allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-        $maxSize = 5 * 1024 * 1024; // 5MB
-
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        $mimeType = mime_content_type($file['tmp_name']);
-
-        if (!in_array($ext, $allowedExts) || !in_array($mimeType, $allowedMimes)) {
-            return ['success' => false, 'message' => 'Chỉ chấp nhận file ảnh JPG, PNG, WEBP, GIF!'];
-        }
-
-        if ($file['size'] > $maxSize) {
-            return ['success' => false, 'message' => 'Dung lượng ảnh tối đa là 5MB!'];
-        }
-
-        $newFilename = 'art_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-        if (move_uploaded_file($file['tmp_name'], $this->uploadDir . $newFilename)) {
-            return ['success' => true, 'filename' => $newFilename];
-        }
-
-        return ['success' => false, 'message' => 'Không thể lưu file ảnh lên máy chủ!'];
+    private function renderList(int $page, ?array $editArticle, array $filters = [], ?int $total = null, int $limit = 10): void
+    {
+        $total ??= $this->articleModel->countAllAdmin($filters);
+        $this->view('admin/articles', ['page_title' => 'Quản lý bài viết — NEWS HUB', 'baseUrl' => $this->baseUrl,
+            'articles' => $this->articleModel->getAllAdmin($limit, ($page - 1) * $limit, $filters),
+            'categories' => $this->categoryModel->getAll(200, 0), 'editArticle' => $editArticle, 'page' => $page,
+            'totalPages' => max(1, (int)ceil($total / $limit)), 'totalArticles' => $total,
+            'filters' => $filters, 'csrf_token' => $this->csrfToken()]);
     }
 
-    // Vòng lặp xử lý upload nhiều ảnh 
-    private function handleMultipleUploads($articleId, $files) {
-        foreach ($files['tmp_name'] as $key => $tmpName) {
-            if ($files['error'][$key] === UPLOAD_ERR_OK) {
-                $singleFile = [
-                    'name'     => $files['name'][$key],
-                    'type'     => $files['type'][$key],
-                    'tmp_name' => $tmpName,
-                    'error'    => $files['error'][$key],
-                    'size'     => $files['size'][$key]
-                ];
-                $res = $this->uploadSingleFile($singleFile);
-                if ($res['success']) {
-                    $this->articleModel->addArticleImage($articleId, $res['filename']);
-                }
+    private function validatedInput(): array
+    {
+        $titleInput = $_POST['title'] ?? '';
+        $summaryInput = $_POST['summary'] ?? '';
+        $contentInput = $_POST['content'] ?? '';
+        if (!is_string($titleInput) || !is_string($summaryInput) || !is_string($contentInput)) {
+            throw new InvalidArgumentException('Invalid article fields.');
+        }
+        $title = trim($titleInput);
+        $categoryInput = $_POST['category_id'] ?? null;
+        $categoryId = is_string($categoryInput) ? filter_var($categoryInput, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
+        $content = $contentInput;
+        if ($title === '' || mb_strlen($title, 'UTF-8') > 255 || !$categoryId || trim(strip_tags($content)) === ''
+            || mb_strlen($summaryInput, 'UTF-8') > 10000) {
+            throw new InvalidArgumentException('Invalid article fields.');
+        }
+        $category = $this->categoryModel->getById((int)$categoryId);
+        if (!$category || $category['status'] !== 'active') throw new InvalidArgumentException('Choose an active category.');
+        $status = in_array($_POST['status'] ?? '', ['draft','published'], true) ? $_POST['status'] : 'draft';
+        return ['title' => $title, 'category_id' => (int)$categoryId,
+            'summary' => trim($summaryInput), 'content' => $content,
+            'status' => $status, 'is_featured' => $status === 'published' && isset($_POST['is_featured']) ? 1 : 0,
+            'slug' => is_string($_POST['slug'] ?? '') ? trim($_POST['slug'] ?? '') : ''];
+    }
+
+    private function uniqueSlug(string $source, int $excludeId = 0): string
+    {
+        $base = $this->slugify($source);
+        if ($base === '') $base = 'article';
+        $candidate = substr($base, 0, 240);
+        for ($suffix = 2; $this->articleModel->slugExists($candidate, $excludeId); $suffix++) {
+            $tail = '-' . $suffix;
+            $candidate = substr($base, 0, 255 - strlen($tail)) . $tail;
+        }
+        return $candidate;
+    }
+
+    private function slugify(string $source): string
+    {
+        $source = mb_strtolower(trim($source), 'UTF-8');
+        $source = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $source) ?: $source;
+        $source = preg_replace('/[^a-z0-9]+/', '-', strtolower($source)) ?? '';
+        return trim($source, '-');
+    }
+
+    private function uploadOne(?array $file): ?string
+    {
+        if ($file === null || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) return null;
+        if (!isset($file['error'], $file['tmp_name'], $file['name'], $file['size']) || is_array($file['error'])
+            || $file['error'] !== UPLOAD_ERR_OK || (int)$file['size'] > 5 * 1024 * 1024
+            || !is_uploaded_file($file['tmp_name'])) throw new InvalidArgumentException('Ảnh tải lên không hợp lệ hoặc vượt 5 MB.');
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
+        $extensions = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+        $extension = $extensions[$mime] ?? null;
+        $givenExtension = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));
+        if (!$extension || !in_array($givenExtension, ['jpg','jpeg','png','webp','gif'], true) || !getimagesize($file['tmp_name']))
+            throw new InvalidArgumentException('Chỉ nhận ảnh JPG, PNG, WEBP hoặc GIF hợp lệ.');
+        if (!is_dir($this->uploadDir) && !mkdir($this->uploadDir, 0755, true) && !is_dir($this->uploadDir))
+            throw new RuntimeException('Upload directory unavailable.');
+        $target = $this->uploadDir . '/' . bin2hex(random_bytes(20)) . '.' . $extension;
+        if (!move_uploaded_file($file['tmp_name'], $target)) throw new RuntimeException('Image upload failed.');
+        return $target;
+    }
+
+    private function uploadMany(?array $files): array
+    {
+        if ($files === null || !isset($files['name']) || !is_array($files['name'])) return [];
+        if (count($files['name']) > 10) throw new InvalidArgumentException('Tối đa 10 ảnh nội dung mỗi lần tải.');
+        $stored = [];
+        foreach ($files['name'] as $index => $name) {
+            $error = $files['error'][$index] ?? UPLOAD_ERR_NO_FILE;
+            if ($error === UPLOAD_ERR_NO_FILE) continue;
+            try {
+                $stored[] = $this->uploadOne(['name' => $name, 'tmp_name' => $files['tmp_name'][$index] ?? '',
+                    'error' => $error, 'size' => $files['size'][$index] ?? 0]);
+            } catch (Throwable $e) {
+                $this->deleteFiles($stored);
+                throw $e;
             }
         }
+        return $stored;
     }
 
-    // Tạo slug URL chuẩn SEO từ tiêu đề
-    private function createSlug($str) {
-        $str = mb_strtolower($str, 'UTF-8');
-        $unicode = [
-            'a' => 'á|à|ả|ã|ạ|ă|ắ|ằ|ẳ|ẵ|ặ|â|ấ|ầ|ẩ|ẫ|ậ',
-            'd' => 'đ',
-            'e' => 'é|è|ẻ|ẽ|ẹ|ê|ế|ề|ể|ễ|ệ',
-            'i' => 'í|ì|ỉ|ĩ|ị',
-            'o' => 'ó|ò|ỏ|õ|ọ|ô|ố|ồ|ổ|ỗ|ộ|ơ|ớ|ờ|ở|ỡ|ợ',
-            'u' => 'ú|ù|ủ|ũ|ụ|ư|ứ|ừ|ử|ữ|ự',
-            'y' => 'ý|ỳ|ỷ|ỹ|ỵ',
-        ];
-        foreach ($unicode as $nonUnicode => $uni) {
-            $str = preg_replace("/($uni)/i", $nonUnicode, $str);
+    private function deleteFiles(array $files): void
+    {
+        foreach ($files as $file) if (is_string($file) && is_file($file)) unlink($file);
+    }
+
+    private function deleteIfUnreferenced(string $path): void
+    {
+        if (basename($path) !== $path || !preg_match('/\A[a-f0-9]{40}\.(?:jpg|png|webp|gif)\z/i', $path)) return;
+        if (!$this->articleModel->fileIsReferenced($path)) {
+            $full = $this->uploadDir . '/' . $path;
+            if (is_file($full)) unlink($full);
         }
-        $str = preg_replace('/[^a-z0-9\s-]/', '', $str);
-        $str = preg_replace('/[\s-]+/', '-', trim($str));
-        return $str . '-' . time();
     }
 
-    private function redirect($path) {
-        header("Location: " . $this->baseUrl . $path);
-        exit;
+    private function redirect(string $path): void
+    {
+        $this->redirectTo($this->baseUrl . $path);
     }
 }

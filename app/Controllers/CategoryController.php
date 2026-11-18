@@ -36,8 +36,10 @@ class CategoryController extends Controller {
             $this->redirect('/CategoryController/index');
         }
 
-        $name        = trim($_POST['name'] ?? '');
-        $description = trim($_POST['description'] ?? '');
+        $nameInput = $_POST['name'] ?? '';
+        $descriptionInput = $_POST['description'] ?? '';
+        $name = is_string($nameInput) ? trim($nameInput) : '';
+        $description = is_string($descriptionInput) ? trim($descriptionInput) : '';
 
         if ($name === '') {
             $_SESSION['error'] = "Vui lòng nhập tên danh mục!";
@@ -50,8 +52,11 @@ class CategoryController extends Controller {
 
         $this->categoryModel->create([
             'name'        => $name,
-            'slug'        => $this->createSlug($name),
-            'description' => $description
+            'slug'        => $this->uniqueSlug($name),
+            'description' => $description,
+            'parent_id'   => $this->parentIdFromPost(),
+            'sort_order'  => max(0, (int)($_POST['sort_order'] ?? 0)),
+            'status'      => ($_POST['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active'
         ]);
 
         $_SESSION['success'] = "Thêm danh mục thành công!";
@@ -70,8 +75,10 @@ class CategoryController extends Controller {
             $this->redirect('/CategoryController/index');
         }
 
-        $name        = trim($_POST['name'] ?? '');
-        $description = trim($_POST['description'] ?? '');
+        $nameInput = $_POST['name'] ?? '';
+        $descriptionInput = $_POST['description'] ?? '';
+        $name = is_string($nameInput) ? trim($nameInput) : '';
+        $description = is_string($descriptionInput) ? trim($descriptionInput) : '';
 
         if ($name === '') {
             $_SESSION['error'] = "Vui lòng nhập tên danh mục!";
@@ -84,8 +91,11 @@ class CategoryController extends Controller {
 
         $this->categoryModel->update($id, [
             'name'        => $name,
-            'slug'        => $this->createSlug($name),
-            'description' => $description
+            'slug'        => $this->uniqueSlug($name, $id),
+            'description' => $description,
+            'parent_id'   => $this->parentIdFromPost($id),
+            'sort_order'  => max(0, (int)($_POST['sort_order'] ?? 0)),
+            'status'      => ($_POST['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active'
         ]);
 
         $_SESSION['success'] = "Cập nhật danh mục #$id thành công!";
@@ -94,10 +104,16 @@ class CategoryController extends Controller {
 
     // URL: /CategoryController/delete/{id}
     public function delete($id = 0) {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            header('Allow: POST');
+            return;
+        }
+
         $id = (int)$id;
 
-        if ($this->categoryModel->countArticles($id) > 0) {
-            $_SESSION['error'] = "Không thể xóa: danh mục đang có bài viết. Hãy chuyển bài viết sang danh mục khác trước!";
+        if ($this->categoryModel->countArticles($id) > 0 || $this->categoryModel->countChildren($id) > 0) {
+            $_SESSION['error'] = "Không thể xóa: danh mục đang có bài viết hoặc danh mục con.";
             $this->redirect('/CategoryController/index');
         }
 
@@ -119,29 +135,34 @@ class CategoryController extends Controller {
             'page_title'      => 'Quản lý danh mục - NEWS HUB',
             'baseUrl'         => $this->baseUrl,
             'categories'      => $this->categoryModel->getAll($limit, $offset),
+            'parentCategories' => $this->categoryModel->getChildren((int)($editCategory['id'] ?? 0)),
             'editCategory'    => $editCategory,
             'page'            => $page,
             'totalPages'      => max(1, (int)ceil($total / $limit)),
-            'totalCategories' => $total
+            'totalCategories' => $total,
+            'csrf_token'      => $this->csrfToken()
         ]);
     }
 
-    private function createSlug($str) {
-        $str = mb_strtolower($str, 'UTF-8');
-        $unicode = [
-            'a' => 'á|à|ả|ã|ạ|ă|ắ|ằ|ẳ|ẵ|ặ|â|ấ|ầ|ẩ|ẫ|ậ',
-            'd' => 'đ',
-            'e' => 'é|è|ẻ|ẽ|ẹ|ê|ế|ề|ể|ễ|ệ',
-            'i' => 'í|ì|ỉ|ĩ|ị',
-            'o' => 'ó|ò|ỏ|õ|ọ|ô|ố|ồ|ổ|ỗ|ộ|ơ|ớ|ờ|ở|ỡ|ợ',
-            'u' => 'ú|ù|ủ|ũ|ụ|ư|ứ|ừ|ử|ữ|ự',
-            'y' => 'ý|ỳ|ỷ|ỹ|ỵ',
-        ];
-        foreach ($unicode as $nonUnicode => $uni) {
-            $str = preg_replace("/($uni)/i", $nonUnicode, $str);
+    private function uniqueSlug(string $name, int $excludeId = 0): string {
+        $base = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', mb_strtolower($name, 'UTF-8')) ?: $name;
+        $base = trim(preg_replace('/[^a-z0-9]+/i', '-', strtolower($base)) ?? '', '-');
+        if ($base === '') $base = 'category';
+        $candidate = substr($base, 0, 240);
+        for ($suffix = 2; $this->categoryModel->slugExists($candidate, $excludeId); $suffix++) {
+            $tail = '-' . $suffix;
+            $candidate = substr($base, 0, 255 - strlen($tail)) . $tail;
         }
-        $str = preg_replace('/[^a-z0-9\s-]/', '', $str);
-        return trim(preg_replace('/[\s-]+/', '-', trim($str)), '-');
+        return $candidate;
+    }
+
+    private function parentIdFromPost(int $excludeId = 0): ?int {
+        $parentInput = $_POST['parent_id'] ?? null;
+        $parent = is_string($parentInput) ? filter_var($parentInput, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
+        if (!$parent) return null;
+        $parentCategory = $this->categoryModel->getById((int)$parent);
+        if (!$parentCategory || $parentCategory['parent_id'] !== null || (int)$parent === $excludeId) return null;
+        return (int)$parent;
     }
 
     private function redirect($path) {
