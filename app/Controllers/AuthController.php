@@ -16,10 +16,17 @@ class AuthController extends Controller
     public function login(): void
     {
         if (isset($_SESSION['user']['id'])) {
-            $destination = ($_SESSION['user']['role_name'] ?? '') === 'admin'
-                ? '/DashboardController/index'
-                : '/AccountController/index';
-            $this->redirectTo($this->baseUrl . $destination);
+            if (($_SESSION['user']['role_name'] ?? '') === 'admin') {
+                $this->redirectTo($this->baseUrl . '/DashboardController/index');
+            }
+            if ($this->isAdminEntry()) {
+                $this->renderAuth('Đăng nhập quản trị', 'auth_login', [
+                    'adminEntry' => true,
+                    'error' => 'Bạn đang đăng nhập bằng tài khoản độc giả. Hãy đăng xuất trước khi đăng nhập tài khoản quản trị.',
+                ]);
+                return;
+            }
+            $this->redirectTo($this->baseUrl . '/AccountController/index');
         }
         $this->renderAuth('Đăng nhập', 'auth_login', ['adminEntry' => $this->isAdminEntry()]);
     }
@@ -55,6 +62,14 @@ class AuthController extends Controller
                 'error' => 'Email hoặc mật khẩu không đúng, hoặc tài khoản đã khóa.',
                 'email' => $email,
                 'adminEntry' => $this->isAdminEntry(),
+            ]);
+            return;
+        }
+        if ($this->isAdminEntry() && $user['role_name'] !== 'admin') {
+            $this->renderAuth('Đăng nhập quản trị', 'auth_login', [
+                'error' => 'Tài khoản này chưa được cấp quyền quản trị. Hãy đăng nhập bằng tài khoản Admin.',
+                'email' => $email,
+                'adminEntry' => true,
             ]);
             return;
         }

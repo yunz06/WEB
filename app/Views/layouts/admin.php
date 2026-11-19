@@ -36,9 +36,9 @@ $currentLabel = $adminLinks[$currentSection][0];
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="<?= $escape($baseUrl . '/public/css/style.css?v=20261119-2') ?>" rel="stylesheet">
-    <link href="<?= $escape($baseUrl . '/public/css/admin.css?v=20261119-2') ?>" rel="stylesheet">
-    <link href="<?= $escape($baseUrl . '/public/css/finish.css?v=20261119-1') ?>" rel="stylesheet">
+    <link href="<?= $escape($baseUrl . '/public/css/style.css?v=20261119-4') ?>" rel="stylesheet">
+    <link href="<?= $escape($baseUrl . '/public/css/admin.css?v=20261119-4') ?>" rel="stylesheet">
+    <link href="<?= $escape($baseUrl . '/public/css/finish.css?v=20261119-4') ?>" rel="stylesheet">
 </head>
 <body class="admin-app">
     <a class="skip-link" href="#admin-main">Bỏ qua điều hướng</a>

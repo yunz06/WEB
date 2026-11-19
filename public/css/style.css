@@ -1101,19 +1101,6 @@ a:hover {
     white-space: nowrap;
 }
 
-.site-footer__admin-entry {
-    display: inline-flex;
-    min-height: 2.75rem;
-    align-items: center;
-    color: #e7eef7;
-    font-size: 0.875rem;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 0.25em;
-}
-
-.site-footer__admin-entry:hover {
-    color: var(--news-white);
-}
 
 .comment-guidance {
     margin-top: 0.85rem;
@@ -1350,11 +1337,6 @@ a:hover {
 }
 
 @media (max-width: 575.98px) {
-    .site-footer__admin-entry {
-        width: 100%;
-        order: 2;
-    }
-
     .site-footer small {
         order: 3;
     }

@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 $base = 'http://localhost/Webtintuc'
 $failures = @()
 
-foreach ($path in @('/README.md', '/CHANGELOG.md', '/DESIGN.md', '/TEST_REPORT.md', '/PROJECT_COMPLETION_REPORT.md', '/QA_REMEDIATION_REPORT.md', '/docs/architecture/PROJECT_ARCHITECTURE.md', '/docs/local-only/ADMIN_ACCESS.md', '/.impeccable/design.json', '/.gitignore', '/database/seed.sql', '/config/database.php', '/app/Core/Database.php')) {
+foreach ($path in @('/README.md', '/CHANGELOG.md', '/DESIGN.md', '/TEST_REPORT.md', '/PROJECT_COMPLETION_REPORT.md', '/QA_REMEDIATION_REPORT.md', '/docs/architecture/PROJECT_ARCHITECTURE.md', '/docs/local-only/ADMIN_ACCESS.md', '/.impeccable/design.json', '/.gitignore', '/database/seed.sql', '/config/database.php', '/app/Core/Database.php', '/tools/manage-local-admin.php', '/docker/entrypoint.sh', '/Dockerfile', '/render.yaml')) {
     $status = & curl.exe --silent --show-error --max-time 10 --output NUL --write-out '%{http_code}' ($base + $path)
     if ($LASTEXITCODE -ne 0) { throw "curl failed for $path ($LASTEXITCODE)" }
     if ([int]$status -ne 403) { $failures += "Expected 403, got $status for $path" }

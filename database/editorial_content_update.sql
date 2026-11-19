@@ -1,4 +1,6 @@
 -- NEWS HUB editorial content refresh. Original Vietnamese summaries based on cited public sources.
+-- DIALECT: MariaDB 10.4 / MySQL. Do not run this file through a Microsoft SQL Server (MSSQL) connection.
+-- Run in phpMyAdmin after selecting the MariaDB server, or with the MariaDB mysql client.
 -- Safe for the existing sample slugs only; does not insert, delete, or alter schema.
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `news_hub`;

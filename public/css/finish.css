@@ -23,8 +23,15 @@ body {
 }
 .site-header,
 .masthead,
-.site-header .container {
+.site-header > .container {
     background: #fff !important;
+}
+
+/* The category bar is a sibling of the masthead container, not part of it.
+   Keep its inner container transparent so light nav text stays on navy. */
+.category-nav .container,
+.category-nav .navbar-collapse {
+    background: transparent !important;
 }
 .site-ribbon {
     background: #0b1d33 !important;
@@ -66,11 +73,27 @@ body {
 .category-nav .nav-link {
     min-height: 3.35rem;
     padding-inline: .65rem;
+    border-radius: .35rem;
+    color: #e4edf8 !important;
     font-size: .82rem;
     white-space: nowrap;
+    transition: color .16s ease, background-color .16s ease;
 }
+.category-nav .nav-link:hover,
+.category-nav .nav-link:focus-visible,
+.category-nav .nav-link.show,
 .category-nav .nav-link.active {
     color: #fff !important;
+    background: rgba(255, 255, 255, .13) !important;
+}
+.category-nav .nav-link:focus-visible {
+    outline: 2px solid #bfdbfe;
+    outline-offset: 2px;
+}
+.category-nav .dropdown-menu {
+    z-index: 1080;
+    margin-top: .15rem;
+    box-shadow: 0 12px 28px rgba(10, 26, 48, .2);
 }
 .news-home {
     background: #f7f8fb !important;
@@ -217,10 +240,16 @@ body {
 .site-footer__brand {
     color: #fff !important;
 }
-.site-footer__admin-entry {
-    color: #d9e8ff !important;
+.masthead-actions .masthead-admin-entry {
+    border-color: #b9c9dc !important;
+    background: #eff5fc !important;
+    color: #102747 !important;
+    font-weight: 700;
 }
-.site-footer__admin-entry:hover {
+.masthead-actions .masthead-admin-entry:hover,
+.masthead-actions .masthead-admin-entry:focus-visible {
+    border-color: #2563eb !important;
+    background: #102747 !important;
     color: #fff !important;
 }
 .auth-panel,
@@ -355,5 +384,102 @@ body {
     .masthead-actions > form button {
         width: 100%;
         justify-content: center;
+    }
+}
+
+.auth-admin-help {
+    display: grid;
+    gap: .35rem;
+    margin: 1rem 0 1.25rem;
+    padding: .9rem 1rem;
+    border: 1px solid #cbd9eb;
+    border-left: 4px solid #2563eb;
+    border-radius: .45rem;
+    background: #f2f7ff;
+    color: #24364d;
+    font-size: .92rem;
+    line-height: 1.55;
+}
+.auth-admin-help strong { color: #102747; }
+.auth-admin-help code { color: #102747; font-weight: 600; }
+
+
+/* Final interaction-contrast pass: keep every navigation state readable. */
+.category-nav,
+.category-nav > .container,
+.category-nav .navbar-collapse,
+.category-nav .navbar-nav,
+.category-nav .nav-item {
+    background-color: #102747 !important;
+}
+.category-nav .navbar-brand,
+.category-nav .navbar-brand:hover,
+.category-nav .navbar-brand:focus-visible {
+    color: #f8fbff !important;
+}
+.category-nav .nav-link,
+.category-nav .nav-link:visited {
+    color: #edf4ff !important;
+    background-color: transparent !important;
+    border-radius: .4rem;
+}
+.category-nav .nav-link:hover,
+.category-nav .nav-link:focus,
+.category-nav .nav-link:focus-visible,
+.category-nav .nav-link:active,
+.category-nav .nav-link.show,
+.category-nav .nav-link.active,
+.category-nav .show > .nav-link {
+    color: #ffffff !important;
+    background-color: #294f78 !important;
+    text-decoration: none;
+}
+.category-nav .nav-link.active::after {
+    background-color: #bfdbfe !important;
+}
+.category-nav .dropdown-menu {
+    border-color: #355575 !important;
+    background-color: #102747 !important;
+}
+.category-nav .dropdown-item,
+.category-nav .dropdown-item:visited {
+    color: #f4f8ff !important;
+    background-color: transparent !important;
+}
+.category-nav .dropdown-item:hover,
+.category-nav .dropdown-item:focus,
+.category-nav .dropdown-item:focus-visible,
+.category-nav .dropdown-item:active,
+.category-nav .dropdown-item[aria-current="page"] {
+    color: #102747 !important;
+    background-color: #e8f1ff !important;
+}
+.category-nav .dropdown-divider {
+    border-color: #4a6685 !important;
+}
+
+.masthead-actions .masthead-admin-entry {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    padding: .55rem .85rem;
+    border: 1px solid #9bb5d5 !important;
+    border-radius: .45rem;
+    background: #edf4ff !important;
+    color: #102747 !important;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.masthead-actions .masthead-admin-entry:hover,
+.masthead-actions .masthead-admin-entry:focus-visible {
+    border-color: #102747 !important;
+    background: #102747 !important;
+    color: #ffffff !important;
+}
+@media (max-width: 767.98px) {
+    .masthead-actions .masthead-admin-entry {
+        flex: 1 1 auto;
     }
 }

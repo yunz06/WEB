@@ -17,6 +17,7 @@ foreach ($categories as $category) {
     }
 }
 $authUser = $_SESSION['user'] ?? null;
+$isAdminEntry = !empty($data['adminEntry']);
 $csrfToken = (string)($data['csrf_token'] ?? '');
 $homeUrl = $baseUrl . '/';
 $escape = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
@@ -35,8 +36,8 @@ $escape = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOT
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="<?= $escape($baseUrl . '/public/css/style.css?v=20261119-2') ?>" rel="stylesheet">
-    <link href="<?= $escape($baseUrl . '/public/css/finish.css?v=20261119-1') ?>" rel="stylesheet">
+    <link href="<?= $escape($baseUrl . '/public/css/style.css?v=20261119-4') ?>" rel="stylesheet">
+    <link href="<?= $escape($baseUrl . '/public/css/finish.css?v=20261119-4') ?>" rel="stylesheet">
 </head>
 <body>
     <a class="skip-link" href="#main-content">Bỏ qua điều hướng</a>
@@ -74,8 +75,14 @@ $escape = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOT
                             <button type="submit">Đăng xuất</button>
                         </form>
                     <?php else: ?>
-                        <a href="<?= $escape($baseUrl . '/AuthController/login') ?>">Đăng nhập</a>
-                        <a href="<?= $escape($baseUrl . '/AuthController/register') ?>">Đăng ký</a>
+                        <?php if ($isAdminEntry): ?>
+                            <a href="<?= $escape($homeUrl) ?>">Trang tin</a>
+                            <a href="<?= $escape($baseUrl . '/AuthController/login') ?>">Đăng nhập độc giả</a>
+                        <?php else: ?>
+                            <a href="<?= $escape($baseUrl . '/AuthController/login') ?>">Đăng nhập</a>
+                            <a href="<?= $escape($baseUrl . '/AuthController/register') ?>">Đăng ký</a>
+                            <a class="masthead-admin-entry" href="<?= $escape($baseUrl . '/AuthController/login?area=admin') ?>" aria-label="Mở cổng đăng nhập quản trị viên">Cổng quản trị</a>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -135,7 +142,6 @@ $escape = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOT
         <div class="container site-footer__inner">
             <a class="site-footer__brand" href="<?= $escape($homeUrl) ?>">NEWS HUB</a>
             <p>The World, In Focus.</p>
-            <a class="site-footer__admin-entry" href="<?= $escape($baseUrl . '/AuthController/login?area=admin') ?>">Dành cho quản trị viên</a>
             <small>© <?= date('Y') ?> NEWS HUB</small>
         </div>
     </footer>

@@ -4,10 +4,11 @@ RewriteEngine On
 Options -MultiViews
 DirectoryIndex index.php
 
-# Keep application source, configuration, database scripts, tests, and metadata private.
-RewriteRule ^(app|config|database|tests|docs|\.git|\.agents)(/|$) - [F,L,NC]
+# Keep application source, configuration, database scripts, tests, tools, deployment files, and metadata private.
+RewriteRule ^(app|config|database|tests|tools|docs|docker|\.git|\.agents)(/|$) - [F,L,NC]
 RewriteRule (^|/)\. - [F,L]
-RewriteRule \.(sql|bak|log)$ - [F,L,NC]
+RewriteRule \.(sql|bak|log|ya?ml|sh|dockerignore)$ - [F,L,NC]
+RewriteRule ^(Dockerfile|docker-compose(\..*)?)$ - [F,L,NC]
 RewriteRule \.(md|markdown|txt|ini|dist)$ - [F,L,NC]
 
 RewriteCond %{REQUEST_FILENAME} !-f

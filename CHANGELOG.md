@@ -19,3 +19,22 @@
 - Added user journey, assignment matrix, demo walkthrough, and final acceptance report.
 - Verified Apache route and authorization behavior, protected local notes, MariaDB read-only state, PHP lint, and PHP tests.
 - Browser visual QA, external font/CDN loading, upload round-trip, and rich-text save/read remain unverified.
+
+## 2026-11-19 — UI, Admin access, and deployment readiness
+
+- Fixed category navigation contrast: the masthead's white container no longer overrides the navy category bar; hover, focus, and active states now keep readable text.
+- Moved the Admin portal entry from the footer into the masthead beside reader authentication actions.
+- Clarified the Admin login journey and explicitly reject reader-role accounts at the Admin portal.
+- Documented the local Admin CLI setup and the default seed-only demo account.
+- Added Docker deployment support for PHP 8.2 + Apache, a database-aware health endpoint, and persistent upload directory initialization.
+- Documented XAMPP request/data flow, MariaDB SQL execution (not MSSQL), Netlify limitations, and a Render Docker deployment path.
+- Added regression checks for the Admin entry point, navbar contrast contract, SQL dialect guidance, and deployment configuration.
+
+## 2026-11-19 — Admin access, navigation contrast, and deployment clarity
+
+- Strengthened category navigation base, hover, focus, active, and dropdown color states so labels remain readable on the navy navigation surface.
+- Kept the Admin entry in the public masthead rather than relying on a footer-only link; Admin login no longer offers public registration.
+- Added owner-confirmed local promotion of an existing User account to Admin through the CLI-only account manager, with secure password entry where supported.
+- Clarified that the MariaDB/MySQL update script must be run with a MySQL-compatible client/phpMyAdmin, not the VS Code MSSQL/SQL Server connection.
+- Clarified local XAMPP data flow and the production boundary: public deployments use a hosted database, not the developer laptop's `127.0.0.1`.
+- Added deployment guidance for PHP Docker hosting and documented why Netlify static hosting cannot directly execute this PHP MVC application.

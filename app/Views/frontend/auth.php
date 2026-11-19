@@ -12,7 +12,13 @@ ob_start();
 <main id="main-content" class="container py-5">
     <section class="auth-panel mx-auto" style="max-width: 34rem" aria-labelledby="auth-title">
         <h1 id="auth-title" class="h2 mb-4"><?= $register ? 'Tạo tài khoản NEWS HUB' : ($adminEntry ? 'Đăng nhập quản trị' : 'Đăng nhập') ?></h1>
-        <?php if ($adminEntry): ?><p class="auth-context">Cổng dành cho quản trị viên. Quyền truy cập được kiểm tra sau khi đăng nhập.</p><?php endif; ?>
+        <?php if ($adminEntry): ?>
+            <p class="auth-context">Cổng dành riêng cho quản trị viên. Hệ thống xác minh role Admin từ database sau khi đăng nhập; tài khoản độc giả không thể vào khu vực này.</p>
+            <div class="auth-admin-help" role="note">
+                <strong>Đây là cổng dành riêng cho tài khoản quản trị.</strong>
+                <span>Không có chức năng đăng ký Admin công khai. Nếu bạn là chủ dự án và chưa có tài khoản hoặc quên mật khẩu, hãy chạy <code>D:\xampp\php\php.exe tools\manage-local-admin.php</code> trong PowerShell tại thư mục project. Nếu email đã thuộc tài khoản User, công cụ sẽ yêu cầu nhập <code>PROMOTE</code> để xác nhận cấp quyền Admin. Công cụ chỉ chạy bằng PHP CLI, không qua trình duyệt.</span>
+            </div>
+        <?php endif; ?>
         <?php if (!empty($data['error'])): ?><p class="alert alert-danger" role="alert" aria-live="polite"><?= $escape($data['error']) ?></p><?php endif; ?>
         <form method="post" action="<?= $escape($authAction) ?>">
             <input type="hidden" name="csrf_token" value="<?= $escape($data['csrf_token'] ?? '') ?>">
@@ -31,11 +37,14 @@ ob_start();
             <?php endif; ?>
             <button class="btn btn-primary" type="submit"><?= $register ? 'Tạo tài khoản' : 'Đăng nhập' ?></button>
         </form>
-        <p class="mt-4 mb-0">
-            <?php if ($register): ?>Đã có tài khoản? <a href="<?= $escape($baseUrl . '/AuthController/login') ?>">Đăng nhập</a>
-            <?php else: ?>Chưa có tài khoản? <a href="<?= $escape($baseUrl . '/AuthController/register') ?>">Đăng ký</a><?php endif; ?>
-        </p>
-        <?php if ($adminEntry): ?><p class="mt-3 mb-0"><a href="<?= $escape($baseUrl . '/AuthController/login') ?>">Đăng nhập độc giả</a></p><?php endif; ?>
+        <?php if ($adminEntry): ?>
+            <p class="mt-4 mb-0">Đăng nhập bằng tài khoản đã được cấp role Admin. <a href="<?= $escape($baseUrl . '/AuthController/login') ?>">Đăng nhập độc giả</a></p>
+        <?php else: ?>
+            <p class="mt-4 mb-0">
+                <?php if ($register): ?>Đã có tài khoản? <a href="<?= $escape($baseUrl . '/AuthController/login') ?>">Đăng nhập</a>
+                <?php else: ?>Chưa có tài khoản? <a href="<?= $escape($baseUrl . '/AuthController/register') ?>">Đăng ký</a><?php endif; ?>
+            </p>
+        <?php endif; ?>
     </section>
 </main>
 <?php
