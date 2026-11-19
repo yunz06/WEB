@@ -2,14 +2,22 @@
 
 class HomeController extends Controller
 {
-    public function index(): void
+    public function index(int $page = 1): void
     {
         $articleModel = $this->model('Article');
         $categories = $articleModel->getCategories();
         $selectedCategoryId = null;
         $featuredArticles = $articleModel->getFeaturedPublished(5);
         $featuredArticle = $featuredArticles[0] ?? null;
-        $latestArticles = $articleModel->getPublished(12, 0);
+        $featuredIds = array_map('intval', array_column($featuredArticles, 'id'));
+        $latestLimit = 12;
+        $latestTotal = $articleModel->countLatestPublishedExcluding($featuredIds);
+        $latestTotalPages = max(1, (int)ceil($latestTotal / $latestLimit));
+        $page = min(max(1, $page), $latestTotalPages);
+        $latestArticles = $articleModel->getLatestPublishedExcluding($featuredIds, $latestLimit, ($page - 1) * $latestLimit);
+        $rootCategories = array_values(array_filter($categories, static fn(array $category): bool => $category['parent_id'] === null));
+        $sectionCategoryIds = array_map('intval', array_column(array_slice($rootCategories, 0, 8), 'id'));
+        $categorySections = $articleModel->getPublishedCategorySections($sectionCategoryIds, 3);
 
         $scriptDirectory = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/index.php'));
         $baseUrl = rtrim($scriptDirectory, '/');
@@ -23,6 +31,9 @@ class HomeController extends Controller
             'featuredArticle' => $featuredArticle,
             'featuredArticles' => array_slice($featuredArticles, 1),
             'latestArticles' => $latestArticles,
+            'latestPage' => $page,
+            'latestTotalPages' => $latestTotalPages,
+            'categorySections' => $categorySections,
         ]);
     }
 

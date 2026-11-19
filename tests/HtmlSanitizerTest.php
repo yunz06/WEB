@@ -17,14 +17,23 @@ $input = '<h2>News</h2><p>Hello <strong>world</strong>.</p>'
     . '<iframe srcdoc="<script>alert(5)</script>">embed</iframe>';
 $output = HtmlSanitizer::sanitizeArticleContent($input);
 
-$checks = [
-    'keeps allowed rich text' => str_contains($output, '<h2>News</h2>')
-        && str_contains($output, '<strong>world</strong>'),
-    'removes executable elements and attributes' => !preg_match('/<\/?script\b|<iframe\b|onerror\s*=|onclick\s*=|srcdoc\s*=/i', $output),
-    'removes unsafe links and images' => !preg_match('/javascript:|<img\b/i', $output),
-    'keeps safe links without extra attributes' => str_contains($output, 'href="https://example.com"')
-        && !str_contains($output, 'target='),
-];
+if (class_exists(DOMDocument::class)) {
+    $checks = [
+        'keeps allowed rich text' => str_contains($output, '<h2>News</h2>')
+            && str_contains($output, '<strong>world</strong>'),
+        'removes executable elements and attributes' => !preg_match('/<\/?script\b|<iframe\b|onerror\s*=|onclick\s*=|srcdoc\s*=/i', $output),
+        'removes unsafe links and images' => !preg_match('/javascript:|<img\b/i', $output),
+        'keeps safe links without extra attributes' => str_contains($output, 'href="https://example.com"')
+            && !str_contains($output, 'target='),
+    ];
+} else {
+    $checks = [
+        'uses safe text fallback without DOM' => str_contains($output, '&lt;h2&gt;News&lt;/h2&gt;')
+            && str_contains($output, '&lt;strong&gt;world&lt;/strong&gt;'),
+        'fallback cannot execute supplied markup' => !str_contains($output, '<') && str_contains($output, '&lt;script&gt;'),
+        'fallback escapes unsafe URLs' => str_contains($output, 'javascript:') && str_contains($output, '&lt;a'),
+    ];
+}
 
 foreach ($checks as $name => $passed) {
     if (!$passed) {

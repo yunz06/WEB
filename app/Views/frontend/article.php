@@ -35,8 +35,9 @@ ob_start();
             <?php
             $thumbnailUrl = $articleImageUrl($article['thumbnail'] ?? null);
             $categoryId = (int)($article['category_id'] ?? 0);
+            $categorySlug = trim((string)($article['category_slug'] ?? ''));
             $categoryUrl = $categoryId > 0
-                ? $homeUrl . '?category=' . $categoryId
+                ? $baseUrl . '/PublicCategoryController/show/' . rawurlencode($categorySlug)
                 : $homeUrl;
             $date = $publishedDate($article);
             $images = is_array($article['images'] ?? null) ? $article['images'] : [];
@@ -44,6 +45,13 @@ ob_start();
             $safeContent = HtmlSanitizer::sanitizeArticleContent((string)($article['content'] ?? ''));
             ?>
             <article class="article-detail">
+                <nav aria-label="Đường dẫn trang">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="<?= $escape($homeUrl) ?>">Trang chủ</a></li>
+                        <?php if ($categoryId > 0): ?><li class="breadcrumb-item"><a href="<?= $escape($categoryUrl) ?>"><?= $escape($article['category_name'] ?? 'Chuyên mục') ?></a></li><?php endif; ?>
+                        <li class="breadcrumb-item active" aria-current="page"><?= $escape($article['title'] ?? '') ?></li>
+                    </ol>
+                </nav>
                 <a class="article-back-link" href="<?= $escape($categoryUrl) ?>">
                     Quay lại <?= $escape($article['category_name'] ?? 'danh mục') ?>
                 </a>
@@ -91,6 +99,19 @@ ob_start();
                     <a class="article-back-link" href="<?= $escape($categoryUrl) ?>">Quay lại danh mục</a>
                     <a class="article-back-link" href="<?= $escape($homeUrl) ?>">Về trang chủ</a>
                 </footer>
+                <?php if (!empty($data['relatedArticles'])): ?>
+                    <section class="related-stories" aria-labelledby="related-stories-heading">
+                        <h2 id="related-stories-heading">Bài viết liên quan</h2>
+                        <div class="related-stories__list">
+                            <?php foreach ($data['relatedArticles'] as $relatedArticle): ?>
+                                <article>
+                                    <p class="story-category"><?= $escape($relatedArticle['category_name'] ?? '') ?></p>
+                                    <h3><a href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$relatedArticle['id']) ?>"><?= $escape($relatedArticle['title'] ?? '') ?></a></h3>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
+                    </section>
+                <?php endif; ?>
                 <section class="article-comments" aria-labelledby="comments-heading">
                     <h2 id="comments-heading">Bình luận</h2>
                     <?php if (!empty($_SESSION['flash_success'])): ?><p class="alert alert-success" role="status"><?= $escape($_SESSION['flash_success']); unset($_SESSION['flash_success']); ?></p><?php endif; ?>
@@ -107,7 +128,13 @@ ob_start();
                             <textarea class="form-control" id="comment-content" name="content" maxlength="3000" required></textarea>
                             <button class="btn btn-primary mt-2" type="submit">Gửi bình luận</button>
                         </form>
-                    <?php else: ?><p><a href="<?= $escape($baseUrl . '/AuthController/login') ?>">Đăng nhập</a> để gửi bình luận.</p><?php endif; ?>
+                        <p class="comment-guidance">Bình luận mới sẽ chờ duyệt. Theo dõi trạng thái tại <a href="<?= $escape($baseUrl . '/AccountController/index') ?>">Tài khoản</a>.</p>
+                    <?php else: ?>
+                        <p class="comment-guidance">Đăng nhập để gửi bình luận. Bình luận mới sẽ chờ duyệt; sau đó bạn có thể theo dõi trạng thái trong tài khoản.</p>
+                        <p><a href="<?= $escape($baseUrl . '/AuthController/login') ?>">Đăng nhập</a>
+                            <span aria-hidden="true">·</span>
+                            <a href="<?= $escape($baseUrl . '/AuthController/register') ?>">Tạo tài khoản</a></p>
+                    <?php endif; ?>
                 </section>
             </article>
         <?php endif; ?>

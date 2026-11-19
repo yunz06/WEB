@@ -16,12 +16,12 @@ $formAction = $editCategory
 <!-- Admin header and sidebar can be added here when available. -->
 
 <style>
-    :root { --news-primary: #0f545a; }
+    :root { --news-primary: #102747; }
 </style>
 
-<main class="container-fluid py-4">
+<section class="container-fluid py-4 admin-page">
     <header class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold mb-0" style="color: var(--news-primary);">Quản Lý Danh Mục (NEWS HUB)</h2>
+        <h1 class="fw-bold mb-0" style="color: var(--news-primary);">Quản Lý Danh Mục (NEWS HUB)</h1>
         <?php if ($editCategory): ?>
             <a href="<?= $baseUrl ?>/CategoryController/index" class="btn btn-outline-secondary">+ Quay lại thêm danh mục mới</a>
         <?php endif; ?>
@@ -111,7 +111,7 @@ $formAction = $editCategory
                                        class="btn btn-sm btn-outline-primary">Sửa</a>
                                     <form method="POST" action="<?= $baseUrl ?>/CategoryController/delete/<?= (int)$row['id'] ?>"
                                           class="d-inline"
-                                          onsubmit="return confirm('Bạn có chắc chắn muốn xóa danh mục này?')">
+                                          data-confirm="Bạn có chắc chắn muốn xóa danh mục này?">
                                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
                                     </form>
@@ -141,6 +141,6 @@ $formAction = $editCategory
             </nav>
         <?php endif; ?>
     </section>
-</main>
+</section>
 
 <?php $pageContent = (string)ob_get_clean(); require __DIR__ . '/../layouts/admin.php'; ?>

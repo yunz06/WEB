@@ -29,6 +29,32 @@ class Comment
         return $stmt->fetchAll();
     }
 
+    public function getForUser(int $userId, int $limit, int $offset): array
+    {
+        if ($userId < 1) return [];
+
+        $stmt = $this->pdo->prepare('SELECT c.id,c.article_id,c.user_id,c.content,c.status,c.created_at,
+                a.title AS article_title,a.slug AS article_slug,a.status AS article_status,
+                a.published_at AS article_published_at
+            FROM comments c JOIN articles a ON a.id=c.article_id
+            WHERE c.user_id=:user_id
+            ORDER BY c.created_at DESC,c.id DESC LIMIT :limit OFFSET :offset');
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', max(1, min(100, $limit)), PDO::PARAM_INT);
+        $stmt->bindValue(':offset', max(0, $offset), PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function countForUser(int $userId): int
+    {
+        if ($userId < 1) return 0;
+
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM comments WHERE user_id=:user_id');
+        $stmt->execute([':user_id' => $userId]);
+        return (int)$stmt->fetchColumn();
+    }
+
     public function getAll(int $limit, int $offset, string $status = ''): array
     {
         $sql = 'SELECT c.*,u.full_name AS user_name,a.title AS article_title FROM comments c

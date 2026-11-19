@@ -1,0 +1,26 @@
+/.env
+/.env.*
+!/.env.example
+
+# Database exports and local backups; keep source schema and migrations tracked.
+/*.sql
+/*.sql.gz
+/*.dump
+/*.dump.sql
+/news_hub-before-*.sql
+/database/backups/
+/database/dumps/
+
+# Local logs, sessions, caches, and scratch files.
+/logs/
+/sessions/
+/cache/
+/tmp/
+/temp/
+*.log
+*.cookie
+*.cookies
+*.session
+*.sess
+*.tmp
+/docs/local-only/

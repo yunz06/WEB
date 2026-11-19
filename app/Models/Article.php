@@ -88,13 +88,159 @@ class Article
         $sql = "SELECT a.*, c.name AS category_name, c.slug AS category_slug, u.full_name AS author_name
                 FROM articles a JOIN categories c ON c.id=a.category_id LEFT JOIN users u ON u.id=a.user_id
                 WHERE a.status='published' AND a.published_at IS NOT NULL AND a.published_at <= CURRENT_TIMESTAMP
-                AND c.status='active'";
+                AND c.status='active'
+                AND (c.parent_id IS NULL OR EXISTS
+                    (SELECT 1 FROM categories p WHERE p.id=c.parent_id AND p.status='active'))";
         if ($categoryId !== null) $sql .= ' AND a.category_id = :category_id';
         $sql .= ' ORDER BY a.published_at DESC, a.id DESC LIMIT :limit OFFSET :offset';
         $stmt = $this->pdo->prepare($sql);
         if ($categoryId !== null) $stmt->bindValue(':category_id', (int)$categoryId, PDO::PARAM_INT);
         $stmt->bindValue(':limit', max(1, min(100, (int)$limit)), PDO::PARAM_INT);
         $stmt->bindValue(':offset', max(0, (int)$offset), PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function getLatestPublishedExcluding(array $excludedIds, int $limit = 10, int $offset = 0): array
+    {
+        $excludedIds = array_values(array_unique(array_filter(array_map('intval', $excludedIds), static fn(int $id): bool => $id > 0)));
+        $sql = "SELECT a.*, c.name AS category_name, c.slug AS category_slug, u.full_name AS author_name
+                FROM articles a JOIN categories c ON c.id=a.category_id LEFT JOIN users u ON u.id=a.user_id
+                WHERE a.status='published' AND a.published_at IS NOT NULL AND a.published_at <= CURRENT_TIMESTAMP
+                AND c.status='active'
+                AND (c.parent_id IS NULL OR EXISTS
+                    (SELECT 1 FROM categories p WHERE p.id=c.parent_id AND p.status='active'))";
+        $params = [];
+        if ($excludedIds !== []) {
+            $placeholders = [];
+            foreach ($excludedIds as $index => $id) {
+                $placeholder = ':excluded_' . $index;
+                $placeholders[] = $placeholder;
+                $params[$placeholder] = $id;
+            }
+            $sql .= ' AND a.id NOT IN (' . implode(', ', $placeholders) . ')';
+        }
+        $sql .= ' ORDER BY a.published_at DESC, a.id DESC LIMIT :limit OFFSET :offset';
+        $stmt = $this->pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value, PDO::PARAM_INT);
+        }
+        $stmt->bindValue(':limit', max(1, min(100, $limit)), PDO::PARAM_INT);
+        $stmt->bindValue(':offset', max(0, $offset), PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function countLatestPublishedExcluding(array $excludedIds): int
+    {
+        $excludedIds = array_values(array_unique(array_filter(
+            array_map('intval', $excludedIds),
+            static fn(int $id): bool => $id > 0
+        )));
+        $sql = "SELECT COUNT(*) FROM articles a JOIN categories c ON c.id=a.category_id
+            WHERE a.status='published' AND a.published_at IS NOT NULL AND a.published_at <= CURRENT_TIMESTAMP
+            AND c.status='active'
+            AND (c.parent_id IS NULL OR EXISTS
+                (SELECT 1 FROM categories p WHERE p.id=c.parent_id AND p.status='active'))";
+        $params = [];
+        if ($excludedIds !== []) {
+            $placeholders = [];
+            foreach ($excludedIds as $index => $id) {
+                $placeholder = ':excluded_' . $index;
+                $placeholders[] = $placeholder;
+                $params[$placeholder] = $id;
+            }
+            $sql .= ' AND a.id NOT IN (' . implode(', ', $placeholders) . ')';
+        }
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn();
+    }
+
+    public function getPublishedCategorySections(array $categoryIds, int $limitPerCategory = 3): array
+    {
+        $categoryIds = array_values(array_unique(array_filter(array_map('intval', $categoryIds), static fn(int $id): bool => $id > 0)));
+        if ($categoryIds === []) {
+            return [];
+        }
+
+        $placeholders = [];
+        $params = [];
+        foreach ($categoryIds as $index => $id) {
+            $placeholder = ':category_' . $index;
+            $placeholders[] = $placeholder;
+            $params[$placeholder] = $id;
+        }
+        $params[':limit_per_category'] = max(1, min(10, $limitPerCategory));
+
+        $sql = "SELECT * FROM (
+                    SELECT root.id AS section_id, root.name AS section_name, root.slug AS section_slug,
+                        a.*, content_category.name AS category_name, content_category.slug AS category_slug,
+                        u.full_name AS author_name,
+                        ROW_NUMBER() OVER (PARTITION BY root.id ORDER BY a.published_at DESC, a.id DESC) AS section_position
+                    FROM categories root
+                    JOIN categories content_category
+                        ON content_category.id = root.id OR content_category.parent_id = root.id
+                    JOIN articles a ON a.category_id = content_category.id
+                    LEFT JOIN users u ON u.id = a.user_id
+                    WHERE root.id IN (" . implode(', ', $placeholders) . ")
+                        AND root.status = 'active'
+                        AND content_category.status = 'active'
+                        AND (content_category.parent_id IS NULL OR EXISTS
+                            (SELECT 1 FROM categories parent
+                                WHERE parent.id = content_category.parent_id AND parent.status = 'active'))
+                        AND a.status = 'published'
+                        AND a.published_at IS NOT NULL
+                        AND a.published_at <= CURRENT_TIMESTAMP
+                ) AS ranked
+                WHERE section_position <= :limit_per_category
+                ORDER BY section_id, section_position";
+        $stmt = $this->pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value, PDO::PARAM_INT);
+        }
+        $stmt->execute();
+
+        $sections = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $sectionId = (int)$row['section_id'];
+            if (!isset($sections[$sectionId])) {
+                $sections[$sectionId] = [
+                    'id' => $sectionId,
+                    'name' => $row['section_name'],
+                    'slug' => $row['section_slug'],
+                    'articles' => [],
+                ];
+            }
+            unset($row['section_id'], $row['section_name'], $row['section_slug'], $row['section_position']);
+            $sections[$sectionId]['articles'][] = $row;
+        }
+
+        return $sections;
+    }
+
+    public function getRelatedPublished(int $articleId, int $categoryId, int $limit = 3): array
+    {
+        $stmt = $this->pdo->prepare("SELECT a.*, c.name AS category_name, c.slug AS category_slug,
+                    u.full_name AS author_name
+                FROM articles a
+                JOIN categories c ON c.id = a.category_id
+                LEFT JOIN users u ON u.id = a.user_id
+                WHERE a.id <> :article_id
+                    AND a.category_id = :category_id
+                    AND a.status = 'published'
+                    AND a.published_at IS NOT NULL
+                    AND a.published_at <= CURRENT_TIMESTAMP
+                    AND c.status = 'active'
+                    AND (c.parent_id IS NULL OR EXISTS
+                        (SELECT 1 FROM categories parent
+                            WHERE parent.id = c.parent_id AND parent.status = 'active'))
+                ORDER BY a.published_at DESC, a.id DESC
+                LIMIT :limit");
+        $stmt->bindValue(':article_id', $articleId, PDO::PARAM_INT);
+        $stmt->bindValue(':category_id', $categoryId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', max(1, min(10, $limit)), PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
     }

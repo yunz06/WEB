@@ -8,6 +8,7 @@ DirectoryIndex index.php
 RewriteRule ^(app|config|database|tests|docs|\.git|\.agents)(/|$) - [F,L,NC]
 RewriteRule (^|/)\. - [F,L]
 RewriteRule \.(sql|bak|log)$ - [F,L,NC]
+RewriteRule \.(md|markdown|txt|ini|dist)$ - [F,L,NC]
 
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

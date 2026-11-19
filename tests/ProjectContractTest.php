@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+if (!in_array('mysql', PDO::getAvailableDrivers(), true)) { echo "SKIP: pdo_mysql is required for database contract tests.\n"; exit(0); }
+
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../app/Core/Database.php';
 

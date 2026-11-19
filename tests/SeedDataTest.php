@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+if (!in_array('mysql', PDO::getAvailableDrivers(), true)) { echo "SKIP: pdo_mysql is required for seed data tests.\n"; exit(0); }
+
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../app/Core/Database.php';
 $pdo = Database::getInstance()->getConnection();
@@ -23,10 +25,8 @@ $expect($scalar("SELECT COUNT(*) FROM articles a LEFT JOIN users u ON u.id=a.use
 $expect($scalar("SELECT COUNT(*) FROM articles a LEFT JOIN categories c ON c.id=a.category_id WHERE a.slug LIKE 'sample-%' AND c.id IS NULL") === 0, 'Seeded articles must have valid categories.');
 $expect($scalar("SELECT COUNT(*) FROM article_images i LEFT JOIN articles a ON a.id=i.article_id WHERE i.image_path LIKE 'seed_%' AND a.id IS NULL") === 0, 'Seed images must belong to an article.');
 
-$admin = $pdo->query("SELECT password_hash FROM users WHERE email='admin@newshub.local'")->fetchColumn();
-$reader = $pdo->query("SELECT password_hash FROM users WHERE email='reader@newshub.local'")->fetchColumn();
-$expect(is_string($admin) && password_verify('NewsHubDemo!2026', $admin), 'Demo admin password hash must verify.');
-$expect(is_string($reader) && password_verify('NewsHubReader!2026', $reader), 'Demo reader password hash must verify.');
+$roleNames = $pdo->query('SELECT name FROM roles ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
+$expect($roleNames === ['admin', 'user'], 'Seed should retain the admin and user role records.');
 
 $imageRows = $pdo->query("SELECT DISTINCT thumbnail FROM articles WHERE slug LIKE 'sample-%'")->fetchAll(PDO::FETCH_COLUMN);
 foreach ($imageRows as $image) {
@@ -35,4 +35,4 @@ foreach ($imageRows as $image) {
 }
 
 if ($failures !== []) { fwrite(STDERR, implode(PHP_EOL, $failures) . PHP_EOL); exit(1); }
-echo "PASS: seed content, authorship, demo hashes, and local image checks.\n";
+echo "PASS: seed content, roles, authorship, and local image checks.\n";

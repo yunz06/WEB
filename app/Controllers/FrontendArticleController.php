@@ -23,6 +23,9 @@ class FrontendArticleController extends Controller
             'baseUrl' => $baseUrl,
             'categories' => $articleModel->getCategories(),
             'comments' => $article === null ? [] : $this->model('Comment')->getApprovedForArticle($id),
+            'relatedArticles' => $article === null
+                ? []
+                : $articleModel->getRelatedPublished($id, (int)$article['category_id'], 3),
             'csrf_token' => $this->csrfToken(),
             'article' => $article,
         ]);

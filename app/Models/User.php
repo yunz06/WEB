@@ -22,7 +22,17 @@ class User
 
     public function getById(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT u.*, r.name AS role_name FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=:id');
+        $stmt = $this->pdo->prepare('SELECT u.id,u.role_id,u.full_name,u.email,u.status,u.created_at,u.updated_at,
+                r.name AS role_name
+            FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=:id');
+        $stmt->execute([':id' => $id]);
+        return $stmt->fetch() ?: null;
+    }
+
+    public function getProfileById(int $id): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT u.id,u.full_name,u.email,u.status,u.created_at,r.name AS role_name
+            FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=:id LIMIT 1');
         $stmt->execute([':id' => $id]);
         return $stmt->fetch() ?: null;
     }

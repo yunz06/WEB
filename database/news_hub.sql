@@ -1,6 +1,8 @@
 -- NEWS HUB schema for MariaDB 10.4.32
 -- Safe to import repeatedly: this script does not drop tables or existing data.
 
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 CREATE DATABASE IF NOT EXISTS `news_hub`
     CHARACTER SET utf8mb4
     COLLATE utf8mb4_unicode_ci;

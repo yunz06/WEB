@@ -20,16 +20,15 @@ $formAction = $editArticle
 <!-- Nhúng Admin Header / Sidebar của TV1 tại đây nếu có -->
 <!-- Admin header and sidebar can be added here when available. -->
 
-<!-- Thư viện jQuery & TinyMCE  -->
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<!-- TinyMCE enriches the native textarea; the form remains usable if the CDN is offline. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.8.3/tinymce.min.js"></script>
 
 <style>
     /* Biến CSS  */
     :root {
-        --news-primary: #0f545a;
-        --news-accent: #007bff;
-        --news-bg: #f4f6f9;
+        --news-primary: #102747;
+        --news-accent: #2563eb;
+        --news-bg: #f5f7fa;
     }
     .article-manager img {
         max-width: 100%;
@@ -50,9 +49,9 @@ $formAction = $editArticle
     }
 </style>
 
-<main class="container-fluid py-4 article-manager">
+<section class="container-fluid py-4 article-manager admin-page">
     <header class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold mb-0" style="color: var(--news-primary);">Quản Lý Bài Viết (NEWS HUB)</h2>
+        <h1 class="fw-bold mb-0" style="color: var(--news-primary);">Quản Lý Bài Viết (NEWS HUB)</h1>
         <?php if ($editArticle): ?>
             <a href="<?= $baseUrl ?>/ArticleController/index" class="btn btn-outline-secondary">+ Quay lại thêm bài mới</a>
         <?php endif; ?>
@@ -119,6 +118,7 @@ $formAction = $editArticle
                     <div class="col-12">
                         <label for="editor" class="form-label fw-semibold">Nội dung bài viết <span class="text-danger">*</span></label>
                         <textarea id="editor" name="content"><?= htmlspecialchars($editArticle['content'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></textarea>
+                        <p id="editorFallback" class="form-text" role="status" aria-live="polite" hidden>Trình soạn thảo nâng cao chưa tải được. Bạn vẫn có thể nhập nội dung tại đây.</p>
                     </div>
 
                     <!-- Upload Ảnh đại diện -->
@@ -155,7 +155,7 @@ $formAction = $editArticle
                                                 formenctype="application/x-www-form-urlencoded"
                                                 class="badge bg-danger border-0 position-absolute top-0 end-0"
                                                 aria-label="Xóa ảnh phụ"
-                                                onclick="return confirm('Xóa ảnh này khỏi bài viết?')">×</button>
+                                                data-confirm="Bạn có chắc chắn muốn xóa ảnh phụ này?">×</button>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -247,7 +247,7 @@ $formAction = $editArticle
                                        class="btn btn-sm btn-outline-primary">Sửa</a>
                                     <form method="POST" action="<?= $baseUrl ?>/ArticleController/delete/<?= (int)$row['id'] ?>"
                                           class="d-inline"
-                                          onsubmit="return confirm('Bạn có chắc chắn muốn xóa bài viết này?')">
+                                          data-confirm="Bạn có chắc chắn muốn xóa bài viết này?">
                                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
                                     </form>
@@ -278,57 +278,91 @@ $formAction = $editArticle
             </nav>
         <?php endif; ?>
     </section>
-</main>
+</section>
 
 <script>
-    // 1. Khởi tạo TinyMCE Rich Text Editor 
-    tinymce.init({
-        selector: '#editor',
-        height: 320,
-        menubar: false,
-        plugins: 'lists link image table code wordcount',
-        toolbar: 'undo redo | blocks | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image table | code'
-    });
+    (() => {
+        const editor = document.getElementById('editor');
+        const editorFallback = document.getElementById('editorFallback');
+        const showEditorFallback = () => {
+            if (editorFallback) editorFallback.hidden = false;
+            if (editor) editor.required = true;
+        };
 
-    // 2. Xử lý sự kiện Form & Preview ảnh bằng jQuery 
-    $(function() {
-        // Preview ảnh đại diện ngay khi chọn file
-        $('#thumbnail').on('change', function() {
-            const file = this.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    $('#thumbnailPreview').html(
-                        `<img src="${e.target.result}" class="img-thumbnail" style="max-height: 90px;" alt="Preview">`
-                    );
-                };
-                reader.readAsDataURL(file);
+        if (window.tinymce && typeof window.tinymce.init === 'function' && editor) {
+            try {
+                Promise.resolve(window.tinymce.init({
+                    selector: '#editor',
+                    height: 320,
+                    menubar: false,
+                    plugins: 'lists link image table code wordcount',
+                    toolbar: 'undo redo | blocks | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image table | code'
+                })).then(() => {
+                    editor.required = false;
+                }).catch(showEditorFallback);
+            } catch (error) {
+                showEditorFallback();
+            }
+        } else {
+            showEditorFallback();
+        }
+
+        const articleForm = document.getElementById('articleForm');
+        articleForm?.addEventListener('submit', (event) => {
+            if (window.tinymce && typeof window.tinymce.triggerSave === 'function') {
+                window.tinymce.triggerSave();
+            }
+            if (editor && editor.value.trim() === '') {
+                event.preventDefault();
+                editor.focus();
+                if (editorFallback) {
+                    editorFallback.hidden = false;
+                    editorFallback.textContent = 'Nhập nội dung bài viết trước khi lưu.';
+                }
             }
         });
 
-        // Preview nhiều ảnh đính kèm
-        $('#images').on('change', function() {
-            const container = $('#multiImagePreview');
-            container.empty();
-            Array.from(this.files).forEach(file => {
+        const previewImage = (file, container, alt) => {
+            if (!file || !container) return;
+            const reader = new FileReader();
+            reader.addEventListener('load', () => {
+                if (typeof reader.result !== 'string') return;
+                const image = document.createElement('img');
+                image.src = reader.result;
+                image.alt = alt;
+                image.className = 'img-thumbnail';
+                image.width = 150;
+                image.height = 100;
+                container.replaceChildren(image);
+            });
+            reader.readAsDataURL(file);
+        };
+
+        document.getElementById('thumbnail')?.addEventListener('change', (event) => {
+            const input = event.currentTarget;
+            previewImage(input.files?.[0], document.getElementById('thumbnailPreview'), 'Ảnh đại diện xem trước');
+        });
+
+        document.getElementById('images')?.addEventListener('change', (event) => {
+            const input = event.currentTarget;
+            const container = document.getElementById('multiImagePreview');
+            if (!container) return;
+            container.replaceChildren();
+            Array.from(input.files ?? []).forEach((file, index) => {
                 const reader = new FileReader();
-                reader.onload = function(e) {
-                    container.append(`<img src="${e.target.result}" alt="Preview">`);
-                };
+                reader.addEventListener('load', () => {
+                    if (typeof reader.result !== 'string') return;
+                    const image = document.createElement('img');
+                    image.src = reader.result;
+                    image.alt = `Ảnh nội dung xem trước ${index + 1}`;
+                    image.width = 75;
+                    image.height = 60;
+                    container.append(image);
+                });
                 reader.readAsDataURL(file);
             });
         });
-
-        // Kiểm tra nội dung TinyMCE trước khi submit
-        $('#articleForm').on('submit', function(e) {
-            tinymce.triggerSave(); // Đồng bộ nội dung từ TinyMCE vào textarea #editor
-            const contentVal = $('#editor').val().trim();
-            if (!contentVal) {
-                alert('Vui lòng nhập nội dung chi tiết bài viết!');
-                e.preventDefault();
-            }
-        });
-    });
+    })();
 </script>
 
 <!-- Nhúng Admin Footer của TV1 tại đây nếu có -->

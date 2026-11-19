@@ -80,7 +80,10 @@ try {
     // Only explicitly listed controller actions can be dispatched.
     $routes = [
         'HomeController' => [
-            'index' => ['GET', [], false],
+            'index' => ['GET', ['page?'], false],
+        ],
+        'AccountController' => [
+            'index' => ['GET', ['page?'], false],
         ],
         'FrontendArticleController' => [
             'show' => ['GET', ['id'], false],

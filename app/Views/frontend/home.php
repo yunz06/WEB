@@ -5,7 +5,10 @@ $categories = $data['categories'] ?? [];
 $featuredArticle = $data['featuredArticle'] ?? null;
 $latestArticles = $data['latestArticles'] ?? [];
 $featuredArticles = $data['featuredArticles'] ?? [];
+$categorySections = $data['categorySections'] ?? [];
 $selectedCategoryId = $data['selectedCategoryId'] ?? null;
+$latestPage = max(1, (int)($data['latestPage'] ?? 1));
+$latestTotalPages = max(1, (int)($data['latestTotalPages'] ?? 1));
 $escape = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 
 $articleImageUrl = static function (array $article) use ($baseUrl, $escape): ?string {
@@ -100,7 +103,7 @@ ob_start();
                 <div class="latest-list">
                     <?php foreach ($latestArticles as $article): ?>
                         <article class="latest-story">
-                            <div class="latest-story__media">
+                            <a class="latest-story__media" href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$article['id']) ?>" aria-label="Đọc: <?= $escape($article['title'] ?? '') ?>">
                                 <?php $latestImage = $articleImageUrl($article); ?>
                                 <?php if ($latestImage !== null): ?>
                                     <img src="<?= $latestImage ?>" width="800" height="600" alt="Ảnh đại diện: <?= $escape($article['title'] ?? '') ?>" loading="lazy">
@@ -109,7 +112,7 @@ ob_start();
                                         <span>NEWS HUB</span>
                                     </div>
                                 <?php endif; ?>
-                            </div>
+                            </a>
                             <div class="latest-story__body">
                                 <?php if (!empty($article['category_name'])): ?>
                                     <p class="story-category"><?= $escape($article['category_name']) ?></p>
@@ -130,7 +133,42 @@ ob_start();
             <?php else: ?>
                 <p class="latest-empty">Các bài viết mới sẽ xuất hiện tại đây sau khi được xuất bản.</p>
             <?php endif; ?>
+            <?php if ($latestTotalPages > 1): ?>
+                <nav class="news-pagination" aria-label="Phân trang tin mới nhất">
+                    <?php if ($latestPage > 1): ?>
+                        <a href="<?= $escape($baseUrl . '/HomeController/index/' . ($latestPage - 1) . '#latest') ?>">Tin mới hơn</a>
+                    <?php endif; ?>
+                    <span aria-current="page">Trang <?= $latestPage ?> / <?= $latestTotalPages ?></span>
+                    <?php if ($latestPage < $latestTotalPages): ?>
+                        <a href="<?= $escape($baseUrl . '/HomeController/index/' . ($latestPage + 1) . '#latest') ?>">Tin cũ hơn</a>
+                    <?php endif; ?>
+                </nav>
+            <?php endif; ?>
         </section>
+        <?php if ($categorySections !== []): ?>
+            <div class="category-sections" aria-label="Tin theo chuyên mục">
+                <?php foreach ($categorySections as $section): ?>
+                    <section class="category-section" aria-labelledby="category-section-<?= (int)$section['id'] ?>">
+                        <div class="section-heading">
+                            <h2 id="category-section-<?= (int)$section['id'] ?>">
+                                <a href="<?= $escape($baseUrl . '/PublicCategoryController/show/' . rawurlencode((string)$section['slug'])) ?>"><?= $escape($section['name']) ?></a>
+                            </h2>
+                            <a class="clear-filter" href="<?= $escape($baseUrl . '/PublicCategoryController/show/' . rawurlencode((string)$section['slug'])) ?>">Xem chuyên mục</a>
+                        </div>
+                        <div class="category-section__stories">
+                            <?php foreach ($section['articles'] as $article): ?>
+                                <article class="category-section__story">
+                                    <p class="story-category"><?= $escape($article['category_name'] ?? $section['name']) ?></p>
+                                    <h3><a href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$article['id']) ?>"><?= $escape($article['title'] ?? '') ?></a></h3>
+                                    <?php if (!empty($article['summary'])): ?><p><?= $escape($article['summary']) ?></p><?php endif; ?>
+                                    <?php if ($publishedDate($article) !== ''): ?><time datetime="<?= $escape($article['published_at'] ?? '') ?>"><?= $escape($publishedDate($article)) ?></time><?php endif; ?>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
+                    </section>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
     </div>
 </main>
 <?php
