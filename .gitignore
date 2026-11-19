@@ -1,26 +1,8 @@
-/.env
-/.env.*
-!/.env.example
-
-# Database exports and local backups; keep source schema and migrations tracked.
-/*.sql
-/*.sql.gz
-/*.dump
-/*.dump.sql
-/news_hub-before-*.sql
-/database/backups/
-/database/dumps/
-
-# Local logs, sessions, caches, and scratch files.
-/logs/
-/sessions/
-/cache/
-/tmp/
-/temp/
+# Never upload generated SQL or secrets
+LOCAL_SETUP/admin-bootstrap.generated.sql
+**/config/database.local.php
 *.log
 *.cookie
 *.cookies
-*.session
 *.sess
-*.tmp
-/docs/local-only/
+.env

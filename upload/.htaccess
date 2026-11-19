@@ -1,0 +1,17 @@
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+
+RewriteEngine On
+
+# Never serve PHP source, database scripts, setup helpers, or project metadata.
+RewriteRule ^(app|config|database|tests|tools|docs|docker|local-setup|\.git|\.agents)(/|$) - [F,L,NC]
+RewriteRule (^|/)\. - [F,L]
+RewriteRule \.(sql|bak|log|ya?ml|sh|dockerfile|dockerignore|ini|dist)$ - [F,L,NC]
+RewriteRule ^(Dockerfile|docker-compose(\..*)?)$ - [F,L,NC]
+RewriteRule \.(md|markdown|txt)$ - [F,L,NC]
+
+# Serve existing assets directly; route all other paths through the PHP front controller.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+RewriteRule ^ index.php [QSA,L]
