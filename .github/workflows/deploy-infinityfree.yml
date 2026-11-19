@@ -1,0 +1,169 @@
+name: NEWS HUB - InfinityFree deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "upload/**"
+      - ".github/workflows/deploy-infinityfree.yml"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview FTP changes without uploading"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: newshub-infinityfree-production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate application source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo_mysql, mbstring, fileinfo, dom
+          coverage: none
+
+      - name: Check deployment structure
+        shell: bash
+        run: |
+          test -f upload/index.php
+          test -f upload/.htaccess
+          test -f upload/config/database.php
+          test -d upload/app
+          test -d upload/public
+
+      - name: PHP syntax
+        shell: bash
+        run: |
+          count=0
+          while IFS= read -r -d '' file; do
+            php -l "$file"
+            count=$((count + 1))
+          done < <(find upload -type f -name '*.php' -print0)
+          test "$count" -gt 0
+          echo "PHP files checked: $count"
+
+      - name: JavaScript syntax
+        run: node --check upload/public/js/main.js
+
+      - name: Prevent committed production credentials
+        shell: bash
+        run: |
+          if git ls-files --error-unmatch upload/config/database.local.php >/dev/null 2>&1; then
+            echo "::error::Do not commit upload/config/database.local.php."
+            exit 1
+          fi
+          if git ls-files | grep -E '(^|/)admin-bootstrap\\.generated\\.sql$'; then
+            echo "::error::Remove generated Admin bootstrap SQL from Git."
+            exit 1
+          fi
+          echo "No known production credential file is tracked."
+
+  deploy:
+    name: Deploy complete PHP site to InfinityFree
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # A manual dry-run is allowed before auto-deploy is enabled.
+    if: ${{ vars.INFINITYFREE_DEPLOY_ENABLED == 'true' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == true) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP for private config generation
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          coverage: none
+
+      - name: Require deployment secrets
+        shell: bash
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          DB_HOST: ${{ secrets.NEWS_HUB_DB_HOST }}
+          DB_NAME: ${{ secrets.NEWS_HUB_DB_NAME }}
+          DB_USER: ${{ secrets.NEWS_HUB_DB_USER }}
+          DB_PASSWORD: ${{ secrets.NEWS_HUB_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for key in FTP_SERVER FTP_USERNAME FTP_PASSWORD DB_HOST DB_NAME DB_USER DB_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing GitHub Actions secret: $key"
+              exit 1
+            fi
+          done
+
+      - name: Build deployment directory and generate private DB config
+        shell: bash
+        env:
+          NEWS_HUB_DB_HOST: ${{ secrets.NEWS_HUB_DB_HOST }}
+          NEWS_HUB_DB_NAME: ${{ secrets.NEWS_HUB_DB_NAME }}
+          NEWS_HUB_DB_USER: ${{ secrets.NEWS_HUB_DB_USER }}
+          NEWS_HUB_DB_PASS: ${{ secrets.NEWS_HUB_DB_PASSWORD }}
+          NEWS_HUB_DB_PORT: ${{ secrets.NEWS_HUB_DB_PORT }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp -a upload/. dist/
+          php -r '
+            $keys = ["NEWS_HUB_DB_HOST", "NEWS_HUB_DB_NAME", "NEWS_HUB_DB_USER", "NEWS_HUB_DB_PASS"];
+            foreach ($keys as $key) {
+                if (getenv($key) === false || getenv($key) === "") {
+                    fwrite(STDERR, "Missing database secret: " . $key . PHP_EOL);
+                    exit(1);
+                }
+            }
+            $port = getenv("NEWS_HUB_DB_PORT");
+            $port = ($port !== false && ctype_digit($port) && (int)$port > 0 && (int)$port <= 65535) ? (int)$port : 3306;
+            $config = [
+                "host" => getenv("NEWS_HUB_DB_HOST"),
+                "port" => $port,
+                "name" => getenv("NEWS_HUB_DB_NAME"),
+                "user" => getenv("NEWS_HUB_DB_USER"),
+                "pass" => getenv("NEWS_HUB_DB_PASS"),
+                "charset" => "utf8mb4",
+            ];
+            $php = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export($config, true) . ";\n";
+            if (file_put_contents("dist/config/database.local.php", $php, LOCK_EX) === false) {
+                fwrite(STDERR, "Could not generate private database configuration." . PHP_EOL);
+                exit(1);
+            }
+            chmod("dist/config/database.local.php", 0600);
+          '
+          php -l dist/config/database.local.php
+
+      - name: Deploy full application to htdocs via FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          security: strict
+          local-dir: dist/
+          server-dir: /htdocs/
+          dangerous-clean-slate: false
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          timeout: 60000
+          log-level: standard
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
