@@ -17,8 +17,9 @@ class UserController extends Controller {
     }
 
     // URL: /UserController/index/{page}
-    public function index($page = 1) {
-        $query = is_string($_GET['q'] ?? '') ? trim((string)$_GET['q']) : '';
+    public function index($page = 1) { 
+        $queryInput = $_GET['q'] ?? '';
+        $query = is_string($queryInput) ? trim($queryInput) : '';
         if (mb_strlen($query, 'UTF-8') > 100) $query = mb_substr($query, 0, 100, 'UTF-8');
         $this->renderList($page, null, $this->userModel->countAll($query), $query);
     }
