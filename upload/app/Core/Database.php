@@ -42,6 +42,8 @@ final class Database
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
             ]);
+            // Đồng bộ múi giờ MySQL theo Việt Nam.
+            $this->connection->exec("SET time_zone = '+07:00'");
         } catch (PDOException $exception) {
             error_log('NEWS HUB PDO connection failed: ' . $exception->getMessage());
             throw new RuntimeException('The database connection is unavailable.');
