@@ -1,19 +1,27 @@
 <?php
+
 declare(strict_types=1);
 
-/**
- * Resolves publisher attribution from the editorial source block in an article.
- * Only known HTTPS publisher hosts are rendered as external links.
- */
+/** Publisher attribution extracted from an editorial source block. */
 final class EditorialSource
 {
     private const PUBLISHERS = [
-        'vnexpress.net' => ['name' => 'VnExpress', 'mark' => 'Vn'],
-        'e.vnexpress.net' => ['name' => 'VnExpress', 'mark' => 'Vn'],
-        'tuoitre.vn' => ['name' => 'Tuổi Trẻ Online', 'mark' => 'TT'],
-        'vietnamplus.vn' => ['name' => 'VietnamPlus', 'mark' => 'V+'],
-        'www.vietnamplus.vn' => ['name' => 'VietnamPlus', 'mark' => 'V+'],
-        'baochinhphu.vn' => ['name' => 'Báo Điện tử Chính phủ', 'mark' => 'CP'],
+        'vnexpress.net' => ['name' => 'VnExpress', 'mark' => 'VNEXPRESS'],
+        'e.vnexpress.net' => ['name' => 'VnExpress International', 'mark' => 'VNEXPRESS'],
+        'tuoitre.vn' => ['name' => 'Tuổi Trẻ Online', 'mark' => 'TUỔI TRẺ'],
+        'vietnamplus.vn' => ['name' => 'VietnamPlus', 'mark' => 'VNA'],
+        'www.vietnamplus.vn' => ['name' => 'VietnamPlus', 'mark' => 'VNA'],
+        'en.vietnamplus.vn' => ['name' => 'VietnamPlus', 'mark' => 'VNA'],
+        'baochinhphu.vn' => ['name' => 'Báo Điện tử Chính phủ', 'mark' => 'CHÍNH PHỦ'],
+        'en.baochinhphu.vn' => ['name' => 'Báo Điện tử Chính phủ', 'mark' => 'CHÍNH PHỦ'],
+        'vov.vn' => ['name' => 'VOV', 'mark' => 'VOV'],
+        'english.vov.vn' => ['name' => 'VOV World', 'mark' => 'VOV'],
+        'nhandan.vn' => ['name' => 'Nhân Dân', 'mark' => 'NHÂN DÂN'],
+        'en.nhandan.vn' => ['name' => 'Nhân Dân', 'mark' => 'NHÂN DÂN'],
+        'reuters.com' => ['name' => 'Reuters', 'mark' => 'REUTERS'],
+        'www.reuters.com' => ['name' => 'Reuters', 'mark' => 'REUTERS'],
+        'vietnam.vnanet.vn' => ['name' => 'Thông tấn xã Việt Nam', 'mark' => 'VNA'],
+        'vietnamnews.vn' => ['name' => 'Viet Nam News', 'mark' => 'VNS'],
     ];
 
     public static function fromContent(string $content): ?array
@@ -38,7 +46,6 @@ final class EditorialSource
         }
 
         $publisher = self::PUBLISHERS[$host];
-
         return [
             'publisher' => $publisher['name'],
             'mark' => $publisher['mark'],

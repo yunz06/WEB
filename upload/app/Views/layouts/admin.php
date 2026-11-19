@@ -34,11 +34,12 @@ $currentLabel = $adminLinks[$currentSection][0];
     <title><?= $pageTitle ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="<?= $escape($baseUrl . '/public/css/style.css?v=20261119-6') ?>" rel="stylesheet">
     <link href="<?= $escape($baseUrl . '/public/css/admin.css?v=20261119-6') ?>" rel="stylesheet">
     <link href="<?= $escape($baseUrl . '/public/css/finish.css?v=20261119-6') ?>" rel="stylesheet">
+    <link href="<?= $escape($baseUrl . '/public/css/editorial-refresh.css?v=20261120-1') ?>" rel="stylesheet">
 </head>
 <body class="admin-app">
     <a class="skip-link" href="#admin-main">Bỏ qua điều hướng</a>

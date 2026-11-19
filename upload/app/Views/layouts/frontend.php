@@ -34,10 +34,11 @@ $escape = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOT
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="<?= $escape($baseUrl . '/public/css/style.css?v=20261119-6') ?>" rel="stylesheet">
     <link href="<?= $escape($baseUrl . '/public/css/finish.css?v=20261119-6') ?>" rel="stylesheet">
+    <link href="<?= $escape($baseUrl . '/public/css/editorial-refresh.css?v=20261120-1') ?>" rel="stylesheet">
 </head>
 <body>
     <a class="skip-link" href="#main-content">Bỏ qua điều hướng</a>
@@ -56,7 +57,7 @@ $escape = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOT
                     <span class="brand-name">NEWS<span>HUB</span></span>
                     <span class="brand-tagline">The World, In Focus.</span>
                 </a>
-                <p class="masthead-note">Góc nhìn rõ ràng về những điều đang diễn ra.</p>
+                <p class="masthead-note">Tin trong nước. Chuyện thế giới.</p>
                 <div class="masthead-actions">
                     <form class="header-search" action="<?= $escape($baseUrl . '/SearchController/index') ?>" method="get" role="search">
                         <label class="visually-hidden" for="header-query">Tìm bài viết</label>
@@ -148,5 +149,6 @@ $escape = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOT
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" defer></script>
     <script src="<?= $escape($baseUrl . '/public/js/main.js?v=20261119-6') ?>" defer></script>
+    <script src="<?= $escape($baseUrl . '/public/js/editorial-refresh.js?v=20261120-1') ?>" defer></script>
 </body>
 </html>
