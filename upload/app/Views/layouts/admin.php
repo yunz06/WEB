@@ -40,6 +40,7 @@ $currentLabel = $adminLinks[$currentSection][0];
     <link href="<?= $escape($baseUrl . '/public/css/admin.css?v=20261119-6') ?>" rel="stylesheet">
     <link href="<?= $escape($baseUrl . '/public/css/finish.css?v=20261119-6') ?>" rel="stylesheet">
     <link href="<?= $escape($baseUrl . '/public/css/editorial-refresh.css?v=20261120-1') ?>" rel="stylesheet">
+    <link href="<?= $escape($baseUrl . '/public/css/editorial-redesign.css?v=20261120-2') ?>" rel="stylesheet">
 </head>
 <body class="admin-app">
     <a class="skip-link" href="#admin-main">Bỏ qua điều hướng</a>

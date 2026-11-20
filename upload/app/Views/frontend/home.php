@@ -1,172 +1,119 @@
 <?php
 $data = is_array($data ?? null) ? $data : [];
 $baseUrl = (string)($data['baseUrl'] ?? '');
-$categories = $data['categories'] ?? [];
 $featuredArticle = $data['featuredArticle'] ?? null;
-$latestArticles = $data['latestArticles'] ?? [];
-$featuredArticles = $data['featuredArticles'] ?? [];
-$categorySections = $data['categorySections'] ?? [];
+$latestArticles = is_array($data['latestArticles'] ?? null) ? $data['latestArticles'] : [];
+$featuredArticles = is_array($data['featuredArticles'] ?? null) ? $data['featuredArticles'] : [];
+$categorySections = is_array($data['categorySections'] ?? null) ? $data['categorySections'] : [];
 $selectedCategoryId = $data['selectedCategoryId'] ?? null;
 $latestPage = max(1, (int)($data['latestPage'] ?? 1));
 $latestTotalPages = max(1, (int)($data['latestTotalPages'] ?? 1));
-$escape = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
-require_once __DIR__ . '/../../Core/EditorialSource.php';
+$escape = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
 $articleImageUrl = static function (array $article) use ($baseUrl, $escape): ?string {
     $thumbnail = trim((string)($article['thumbnail'] ?? ''));
-    if ($thumbnail === '') {
-        return null;
-    }
-
+    if ($thumbnail === '') return null;
     $fileName = basename($thumbnail);
     if (!is_file(__DIR__ . '/../../../public/uploads/articles/' . $fileName)) return null;
     return $escape($baseUrl . '/public/uploads/articles/' . rawurlencode($fileName));
 };
-
 $publishedDate = static function (array $article): string {
     $timestamp = strtotime((string)($article['published_at'] ?? $article['created_at'] ?? ''));
     return $timestamp === false ? '' : date('d/m/Y', $timestamp);
 };
+$formatDate = date('d.m.Y');
+$railStories = array_values(array_filter($featuredArticles, static fn(array $item): bool => (int)($item['id'] ?? 0) !== (int)($featuredArticle['id'] ?? 0)));
+if ($railStories === []) $railStories = array_slice($latestArticles, 0, 3);
 
 ob_start();
 ?>
-<main id="main-content" class="news-home">
+<main id="main-content" class="news-home editorial-home">
     <div class="container">
-        <section class="featured-section" aria-labelledby="featured-heading">
-            <div class="section-heading">
-                <h1 id="featured-heading">Tin nổi bật</h1>
-                <span class="section-heading__rule" aria-hidden="true"></span>
-            </div>
+        <div class="home-edition-line"><span>BẢN TIN NGÀY <?= $escape($formatDate) ?></span><span>THÔNG TIN · PHÂN TÍCH · GÓC NHÌN</span></div>
 
-            <?php if (is_array($featuredArticle)): ?>
-                <article class="featured-story">
-                    <div class="featured-story__visual">
-                        <?php $featuredImage = $articleImageUrl($featuredArticle); ?>
-                        <a href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$featuredArticle['id']) ?>" aria-label="Đọc: <?= $escape($featuredArticle['title'] ?? '') ?>">
-                        <?php if ($featuredImage !== null): ?>
-                            <img src="<?= $featuredImage ?>" width="1200" height="800" alt="Ảnh đại diện: <?= $escape($featuredArticle['title'] ?? '') ?>" fetchpriority="high">
-                        <?php else: ?>
-                            <div class="story-placeholder" role="img" aria-label="Bài viết chưa có ảnh đại diện">
-                                <span class="story-placeholder__wordmark">NH</span>
-                                <span class="story-placeholder__caption">NEWS HUB · THE WORLD, IN FOCUS</span>
-                            </div>
-                        <?php endif; ?>
+        <section class="home-lead-grid" aria-labelledby="featured-heading">
+            <div class="home-lead-main">
+                <div class="home-section-label"><span>01</span><h1 id="featured-heading">Tiêu điểm</h1><i></i></div>
+                <?php if (is_array($featuredArticle)): ?>
+                    <?php $featuredImage = $articleImageUrl($featuredArticle); ?>
+                    <article class="featured-story">
+                        <a class="featured-story__visual" href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$featuredArticle['id']) ?>" aria-label="Đọc: <?= $escape($featuredArticle['title'] ?? '') ?>">
+                            <?php if ($featuredImage !== null): ?><img src="<?= $featuredImage ?>" width="1400" height="700" alt="Ảnh minh họa: <?= $escape($featuredArticle['title'] ?? '') ?>" fetchpriority="high"><?php else: ?><div class="story-placeholder"><span>NEWS HUB</span></div><?php endif; ?>
+                            <span class="image-context-label">Ảnh minh họa</span>
                         </a>
-                    </div>
-                    <div class="featured-story__copy">
-                        <?php if (!empty($featuredArticle['category_name'])): ?>
-                            <p class="story-category"><?= $escape($featuredArticle['category_name']) ?></p>
-                        <?php endif; ?>
-                        <h2><a href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$featuredArticle['id']) ?>"><?= $escape($featuredArticle['title'] ?? '') ?></a></h2>
-                        <?php if (!empty($featuredArticle['summary'])): ?>
-                            <p class="featured-story__summary"><?= nl2br($escape($featuredArticle['summary'])) ?></p>
-                        <?php endif; ?>
-                        <?php include __DIR__ . '/partials/source-chip.php'; ?>
-                        <?php if ($publishedDate($featuredArticle) !== ''): ?>
-                            <time class="story-date" datetime="<?= $escape($featuredArticle['created_at'] ?? '') ?>"><?= $escape($publishedDate($featuredArticle)) ?></time>
-                        <?php endif; ?>
-                    </div>
-                </article>
-            <?php else: ?>
-                <div class="empty-feature" role="status">
-                    <div class="empty-feature__mark" aria-hidden="true">NEWS<br>HUB</div>
-                    <div>
-                        <h2>Chưa có bài viết đã xuất bản</h2>
-                        <p>Tin nổi bật sẽ xuất hiện tại đây khi có bài viết được xuất bản.</p>
-                    </div>
-                </div>
-            <?php endif; ?>
-        </section>
-
-        <?php if ($featuredArticles !== []): ?>
-            <section class="featured-supporting" aria-labelledby="featured-supporting-heading">
-                <h2 id="featured-supporting-heading" class="visually-hidden">Tin nổi bật khác</h2>
-                <?php foreach ($featuredArticles as $article): ?>
-                    <article><p class="story-category"><?= $escape($article['category_name'] ?? '') ?></p>
-                        <h3><a href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$article['id']) ?>"><?= $escape($article['title'] ?? '') ?></a></h3>
-                        <?php include __DIR__ . '/partials/source-chip.php'; ?>
+                        <div class="featured-story__copy">
+                            <p class="story-category"><?= $escape($featuredArticle['category_name'] ?? 'Tin mới') ?></p>
+                            <h2><a href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$featuredArticle['id']) ?>"><?= $escape($featuredArticle['title'] ?? '') ?></a></h2>
+                            <?php if (!empty($featuredArticle['summary'])): ?><p class="featured-story__summary"><?= $escape($featuredArticle['summary']) ?></p><?php endif; ?>
+                            <div class="story-card-meta"><time datetime="<?= $escape($featuredArticle['published_at'] ?? '') ?>"><?= $escape($publishedDate($featuredArticle)) ?></time><a href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$featuredArticle['id']) ?>">Đọc bài <span aria-hidden="true">↗</span></a></div>
+                        </div>
                     </article>
-                <?php endforeach; ?>
-            </section>
-        <?php endif; ?>
-
-        <section id="latest" class="latest-section" aria-labelledby="latest-heading">
-            <div class="section-heading section-heading--latest">
-                <div>
-                    <h2 id="latest-heading">
-                        <?= $selectedCategoryId === null ? 'Tin mới nhất' : 'Tin mới theo danh mục' ?>
-                    </h2>
-                </div>
-                <?php if ($selectedCategoryId !== null): ?>
-                    <a class="clear-filter" href="<?= $escape($baseUrl . '/') ?>">Xem tất cả tin</a>
+                <?php else: ?>
+                    <div class="empty-feature"><h2>Chưa có bài viết nổi bật</h2><p>Bài viết đã xuất bản sẽ xuất hiện tại đây.</p></div>
                 <?php endif; ?>
             </div>
 
-            <?php if (!empty($latestArticles)): ?>
+            <aside class="home-lead-rail" aria-labelledby="rail-heading">
+                <div class="home-section-label home-section-label--rail"><span>02</span><h2 id="rail-heading">Đang được chú ý</h2></div>
+                <?php foreach (array_slice($railStories, 0, 4) as $index => $article): ?>
+                    <?php $railImage = $articleImageUrl($article); ?>
+                    <article class="rail-story">
+                        <span class="rail-story-number">0<?= $index + 1 ?></span>
+                        <div class="rail-story-copy"><p class="story-category"><?= $escape($article['category_name'] ?? '') ?></p><h3><a href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$article['id']) ?>"><?= $escape($article['title'] ?? '') ?></a></h3><time datetime="<?= $escape($article['published_at'] ?? '') ?>"><?= $escape($publishedDate($article)) ?></time></div>
+                        <?php if ($railImage !== null): ?><a class="rail-story-image" href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$article['id']) ?>"><img src="<?= $railImage ?>" alt="Ảnh minh họa: <?= $escape($article['title'] ?? '') ?>" loading="lazy"></a><?php endif; ?>
+                    </article>
+                <?php endforeach; ?>
+            </aside>
+        </section>
+
+        <section class="home-latest-section" id="latest" aria-labelledby="latest-heading">
+            <div class="home-section-heading">
+                <div><span class="section-overline">CẬP NHẬT LIÊN TỤC</span><h2 id="latest-heading"><?= $selectedCategoryId === null ? 'Tin mới nhất' : 'Tin mới theo danh mục' ?></h2></div>
+                <?php if ($selectedCategoryId !== null): ?><a class="home-view-all" href="<?= $escape($baseUrl . '/') ?>">Xem tất cả tin <span aria-hidden="true">↗</span></a><?php endif; ?>
+            </div>
+            <?php if ($latestArticles !== []): ?>
                 <div class="latest-list">
                     <?php foreach ($latestArticles as $article): ?>
+                        <?php $latestImage = $articleImageUrl($article); ?>
                         <article class="latest-story">
                             <a class="latest-story__media" href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$article['id']) ?>" aria-label="Đọc: <?= $escape($article['title'] ?? '') ?>">
-                                <?php $latestImage = $articleImageUrl($article); ?>
-                                <?php if ($latestImage !== null): ?>
-                                    <img src="<?= $latestImage ?>" width="800" height="600" alt="Ảnh đại diện: <?= $escape($article['title'] ?? '') ?>" loading="lazy">
-                                <?php else: ?>
-                                    <div class="latest-story__placeholder" role="img" aria-label="Bài viết chưa có ảnh đại diện">
-                                        <span>NEWS HUB</span>
-                                    </div>
-                                <?php endif; ?>
+                                <?php if ($latestImage !== null): ?><img src="<?= $latestImage ?>" width="800" height="500" alt="Ảnh minh họa: <?= $escape($article['title'] ?? '') ?>" loading="lazy"><?php else: ?><span class="latest-story__placeholder">NEWS HUB</span><?php endif; ?>
                             </a>
-                            <div class="latest-story__body">
-                                <?php if (!empty($article['category_name'])): ?>
-                                    <p class="story-category"><?= $escape($article['category_name']) ?></p>
-                                <?php endif; ?>
+                            <div class="latest-story__body"><p class="story-category"><?= $escape($article['category_name'] ?? '') ?></p>
                                 <h3><a href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$article['id']) ?>"><?= $escape($article['title'] ?? '') ?></a></h3>
-                                <?php if (!empty($article['summary'])): ?>
-                                    <p class="latest-story__summary"><?= $escape($article['summary']) ?></p>
-                                <?php endif; ?>
-                                <?php include __DIR__ . '/partials/source-chip.php'; ?>
-                                <?php if ($publishedDate($article) !== ''): ?>
-                                    <time class="story-date" datetime="<?= $escape($article['created_at'] ?? '') ?>"><?= $escape($publishedDate($article)) ?></time>
-                                <?php endif; ?>
+                                <?php if (!empty($article['summary'])): ?><p class="latest-story__summary"><?= $escape($article['summary']) ?></p><?php endif; ?>
+                                <div class="story-card-meta"><time datetime="<?= $escape($article['published_at'] ?? '') ?>"><?= $escape($publishedDate($article)) ?></time><a href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$article['id']) ?>">Chi tiết <span aria-hidden="true">↗</span></a></div>
                             </div>
                         </article>
                     <?php endforeach; ?>
                 </div>
             <?php elseif (is_array($featuredArticle)): ?>
-                <p class="latest-empty">Chưa có thêm bài viết đã xuất bản trong danh mục này.</p>
+                <p class="latest-empty">Chưa có thêm bài viết trong danh mục này.</p>
             <?php else: ?>
-                <p class="latest-empty">Các bài viết mới sẽ xuất hiện tại đây sau khi được xuất bản.</p>
+                <p class="latest-empty">Bài viết mới sẽ xuất hiện tại đây sau khi được xuất bản.</p>
             <?php endif; ?>
             <?php if ($latestTotalPages > 1): ?>
                 <nav class="news-pagination" aria-label="Phân trang tin mới nhất">
-                    <?php if ($latestPage > 1): ?>
-                        <a href="<?= $escape($baseUrl . '/HomeController/index/' . ($latestPage - 1) . '#latest') ?>">Tin mới hơn</a>
-                    <?php endif; ?>
+                    <?php if ($latestPage > 1): ?><a href="<?= $escape($baseUrl . '/HomeController/index/' . ($latestPage - 1) . '#latest') ?>">← Tin mới hơn</a><?php endif; ?>
                     <span aria-current="page">Trang <?= $latestPage ?> / <?= $latestTotalPages ?></span>
-                    <?php if ($latestPage < $latestTotalPages): ?>
-                        <a href="<?= $escape($baseUrl . '/HomeController/index/' . ($latestPage + 1) . '#latest') ?>">Tin cũ hơn</a>
-                    <?php endif; ?>
+                    <?php if ($latestPage < $latestTotalPages): ?><a href="<?= $escape($baseUrl . '/HomeController/index/' . ($latestPage + 1) . '#latest') ?>">Tin cũ hơn →</a><?php endif; ?>
                 </nav>
             <?php endif; ?>
         </section>
+
         <?php if ($categorySections !== []): ?>
-            <div class="category-sections" aria-label="Tin theo chuyên mục">
+            <div class="home-category-sections" aria-label="Tin theo chuyên mục">
                 <?php foreach ($categorySections as $section): ?>
                     <section class="category-section" aria-labelledby="category-section-<?= (int)$section['id'] ?>">
-                        <div class="section-heading">
-                            <h2 id="category-section-<?= (int)$section['id'] ?>">
-                                <a href="<?= $escape($baseUrl . '/PublicCategoryController/show/' . rawurlencode((string)$section['slug'])) ?>"><?= $escape($section['name']) ?></a>
-                            </h2>
-                            <a class="clear-filter" href="<?= $escape($baseUrl . '/PublicCategoryController/show/' . rawurlencode((string)$section['slug'])) ?>">Xem chuyên mục</a>
-                        </div>
+                        <div class="home-section-heading"><div><span class="section-overline">CHUYÊN MỤC</span><h2 id="category-section-<?= (int)$section['id'] ?>"><a href="<?= $escape($baseUrl . '/PublicCategoryController/show/' . rawurlencode((string)$section['slug'])) ?>"><?= $escape($section['name']) ?></a></h2></div><a class="home-view-all" href="<?= $escape($baseUrl . '/PublicCategoryController/show/' . rawurlencode((string)$section['slug'])) ?>">Xem chuyên mục <span aria-hidden="true">↗</span></a></div>
                         <div class="category-section__stories">
                             <?php foreach ($section['articles'] as $article): ?>
+                                <?php $sectionImage = $articleImageUrl($article); ?>
                                 <article class="category-section__story">
+                                    <?php if ($sectionImage !== null): ?><a class="category-section__media" href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$article['id']) ?>"><img src="<?= $sectionImage ?>" alt="Ảnh minh họa: <?= $escape($article['title'] ?? '') ?>" loading="lazy"></a><?php endif; ?>
                                     <p class="story-category"><?= $escape($article['category_name'] ?? $section['name']) ?></p>
                                     <h3><a href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$article['id']) ?>"><?= $escape($article['title'] ?? '') ?></a></h3>
                                     <?php if (!empty($article['summary'])): ?><p><?= $escape($article['summary']) ?></p><?php endif; ?>
-                                    <?php include __DIR__ . '/partials/source-chip.php'; ?>
-                                <?php if ($publishedDate($article) !== ''): ?><time datetime="<?= $escape($article['published_at'] ?? '') ?>"><?= $escape($publishedDate($article)) ?></time><?php endif; ?>
                                 </article>
                             <?php endforeach; ?>
                         </div>

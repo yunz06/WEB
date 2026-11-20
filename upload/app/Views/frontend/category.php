@@ -2,7 +2,6 @@
 $data = is_array($data ?? null) ? $data : [];
 $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $baseUrl = (string)($data['baseUrl'] ?? '');
-require_once __DIR__ . '/../../Core/EditorialSource.php';
 $category = $data['category'] ?? null;
 $articles = $data['articles'] ?? [];
 $parentCategory = $data['parentCategory'] ?? null;
@@ -41,7 +40,7 @@ ob_start();
                     <?php else: ?><span class="latest-story__placeholder">NEWS HUB</span><?php endif; ?></a>
                     <div class="latest-story__body"><h2 class="h4"><a href="<?= $e($baseUrl . '/FrontendArticleController/show/' . (int)$article['id']) ?>"><?= $e($article['title']) ?></a></h2>
                     <?php if (!empty($article['summary'])): ?><p><?= $e($article['summary']) ?></p><?php endif; ?>
-                    <?php include __DIR__ . '/partials/source-chip.php'; ?>
+                    
                     <?php if ($dateLabel($article) !== ''): ?><time datetime="<?= $e($article['published_at'] ?? '') ?>"><?= $e($dateLabel($article)) ?></time><?php endif; ?></div>
                 </article>
             <?php endforeach; ?>
