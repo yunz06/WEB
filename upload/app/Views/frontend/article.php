@@ -7,13 +7,8 @@ $homeUrl = $baseUrl . '/';
 require_once __DIR__ . '/../../Core/EditorialSource.php';
 require_once __DIR__ . '/../../Core/HtmlSanitizer.php';
 
-$articleImageUrl = static function (?string $path) use ($baseUrl, $escape): ?string {
-    $path = trim((string)$path);
-    if ($path === '') return null;
-    $fileName = basename($path);
-    if (!is_file(__DIR__ . '/../../../public/uploads/articles/' . $fileName)) return null;
-    return $escape($baseUrl . '/public/uploads/articles/' . rawurlencode($fileName));
-};
+require_once __DIR__ . '/../../Core/ArticleImage.php';
+$articleImageUrl = static fn(?string $path): ?string => ArticleImage::url($path, $baseUrl);
 
 $publishedDate = static function (array $item): ?string {
     $timestamp = strtotime((string)($item['published_at'] ?? $item['created_at'] ?? ''));
@@ -123,7 +118,7 @@ ob_start();
 
                 <?php if ($thumbnailUrl !== null): ?>
                     <figure class="article-detail__hero">
-                        <img src="<?= $thumbnailUrl ?>" width="1600" height="800" alt="Ảnh minh họa: <?= $escape($article['title'] ?? '') ?>" fetchpriority="high">
+                        <img src="<?= $escape($thumbnailUrl) ?>" width="1600" height="800" alt="Ảnh minh họa: <?= $escape($article['title'] ?? '') ?>" fetchpriority="high">
                         <figcaption><span>Ảnh minh họa</span></figcaption>
                     </figure>
                 <?php endif; ?>
@@ -163,7 +158,7 @@ ob_start();
                                     <?php $relatedImage = $articleImageUrl($relatedArticle['thumbnail'] ?? null); ?>
                                     <article class="article-related-item">
                                         <a class="article-related-image" href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$relatedArticle['id']) ?>">
-                                            <?php if ($relatedImage !== null): ?><img src="<?= $relatedImage ?>" alt="Ảnh minh họa: <?= $escape($relatedArticle['title'] ?? '') ?>" loading="lazy"><?php else: ?><span>NEWS HUB</span><?php endif; ?>
+                                            <?php if ($relatedImage !== null): ?><img src="<?= $escape($relatedImage) ?>" alt="Ảnh minh họa: <?= $escape($relatedArticle['title'] ?? '') ?>" loading="lazy"><?php else: ?><span>NEWS HUB</span><?php endif; ?>
                                         </a>
                                         <div><small><?= $escape($relatedArticle['category_name'] ?? '') ?></small><h3><a href="<?= $escape($baseUrl . '/FrontendArticleController/show/' . (int)$relatedArticle['id']) ?>"><?= $escape($relatedArticle['title'] ?? '') ?></a></h3></div>
                                     </article>
@@ -181,7 +176,7 @@ ob_start();
                                 <?php $imageUrl = $articleImageUrl($image['image_path'] ?? null); ?>
                                 <?php if ($imageUrl !== null): ?>
                                     <figure>
-                                        <img src="<?= $imageUrl ?>" width="800" height="600" alt="<?= $escape($image['alt_text'] ?: ('Ảnh nội dung: ' . ($article['title'] ?? ''))) ?>" loading="lazy">
+                                        <img src="<?= $escape($imageUrl) ?>" width="800" height="600" alt="<?= $escape($image['alt_text'] ?: ('Ảnh nội dung: ' . ($article['title'] ?? ''))) ?>" loading="lazy">
                                         <?php if (!empty($image['caption'])): ?><figcaption><?= $escape($image['caption']) ?></figcaption><?php endif; ?>
                                     </figure>
                                 <?php endif; ?>

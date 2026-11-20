@@ -2,11 +2,8 @@
 $data = is_array($data ?? null) ? $data : [];
 $e = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $baseUrl = (string)($data['baseUrl'] ?? '');
-$imageUrl = static function (array $article) use ($baseUrl, $e): ?string {
-    $filename = basename(trim((string)($article['thumbnail'] ?? '')));
-    if ($filename === '' || !is_file(__DIR__ . '/../../../public/uploads/articles/' . $filename)) return null;
-    return $e($baseUrl . '/public/uploads/articles/' . rawurlencode($filename));
-};
+require_once __DIR__ . '/../../Core/ArticleImage.php';
+$imageUrl = static fn(array $article): ?string => ArticleImage::url($article['thumbnail'] ?? null, $baseUrl);
 ob_start();
 ?>
 <main id="main-content" class="news-home"><div class="container py-4">
@@ -20,7 +17,7 @@ ob_start();
     <?php else: ?><p role="status"><?= (int)$data['totalResults'] ?> kết quả cho “<?= $e($data['query']) ?>”</p><div class="latest-list">
         <?php foreach ($data['articles'] as $article): ?><article class="latest-story">
             <a class="latest-story__media" href="<?= $e($baseUrl . '/FrontendArticleController/show/' . (int)$article['id']) ?>">
-                <?php $thumbnail = $imageUrl($article); if ($thumbnail !== null): ?><img src="<?= $thumbnail ?>" width="800" height="600" alt="Ảnh bài viết: <?= $e($article['title']) ?>" loading="lazy">
+                <?php $thumbnail = $imageUrl($article); if ($thumbnail !== null): ?><img src="<?= $e($thumbnail) ?>" width="800" height="600" alt="Ảnh bài viết: <?= $e($article['title']) ?>" loading="lazy">
                 <?php else: ?><span class="latest-story__placeholder">NEWS HUB</span><?php endif; ?>
             </a>
             <div class="latest-story__body"><p class="story-category"><?= $e($article['category_name']) ?></p>

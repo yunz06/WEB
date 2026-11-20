@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../Core/ArticleImage.php';
 ob_start();
 // Lấy dữ liệu từ mảng $data do Controller truyền sang
 $baseUrl       = $data['baseUrl'] ?? '';
@@ -11,6 +12,8 @@ $totalArticles = $data['totalArticles'] ?? 0;
 $csrfToken     = $data['csrf_token'] ?? '';
 $filters       = $data['filters'] ?? [];
 $filterQuery   = http_build_query(array_filter(['q' => $filters['query'] ?? '', 'status' => $filters['status'] ?? '', 'category_id' => $filters['category_id'] ?? null], static fn($v) => $v !== '' && $v !== null));
+$e = static fn($value): string => htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+$thumbnailUrl = static fn($value): ?string => ArticleImage::url($value, (string)$baseUrl);
 
 $formAction = $editArticle
     ? $baseUrl . '/ArticleController/update/' . $editArticle['id']
@@ -70,6 +73,15 @@ $formAction = $editArticle
         </div>
     <?php endif; ?>
 
+    <div class="alert alert-info small" role="note">
+        <strong>Lưu trữ ảnh:</strong> File ảnh nằm trên máy chủ trong <code>public/uploads/articles/</code>.
+        Cơ sở dữ liệu chỉ lưu tên file trong <code>articles.thumbnail</code>; ảnh nội dung nằm trong bảng <code>article_images</code>.
+        Thay ảnh tại đây sẽ tự cập nhật bài viết và không cần sửa SQL thủ công.
+    </div>
+    <?php if (array_key_exists('imageStorageReady', $data) && !$data['imageStorageReady']): ?>
+        <div class="alert alert-danger" role="alert">Thư mục <code>public/uploads/articles/</code> chưa sẵn sàng để ghi ảnh. Kiểm tra thư mục có tồn tại trong website root và PHP có quyền ghi.</div>
+    <?php endif; ?>
+
     <!-- SECTION 1: FORM THÊM / SỬA BÀI VIẾT -->
     <section class="card shadow-sm mb-5">
         <div class="card-header text-white fw-semibold" style="background-color: var(--news-primary);">
@@ -119,22 +131,33 @@ $formAction = $editArticle
                         <p id="editorFallback" class="form-text" role="status" aria-live="polite" hidden>Trình soạn thảo nâng cao chưa tải được. Bạn vẫn có thể nhập nội dung tại đây.</p>
                     </div>
 
-                    <!-- Upload Ảnh đại diện -->
+                    <!-- Upload Ảnh đại diện: file lưu ở public/uploads/articles, DB lưu tên file -->
                     <div class="col-md-4">
                         <label for="thumbnail" class="form-label fw-semibold">Ảnh đại diện (Thumbnail)</label>
-                        <input type="file" id="thumbnail" name="thumbnail" class="form-control" accept="image/*">
+                        <input type="hidden" name="MAX_FILE_SIZE" value="5242880">
+                        <input type="file" id="thumbnail" name="thumbnail" class="form-control"
+                               accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif">
+                        <small class="form-text">JPG, PNG, WEBP hoặc GIF · tối đa 5 MB/ảnh. Chọn ảnh gắn trực tiếp với nội dung bài viết.</small>
                         <div id="thumbnailPreview" class="mt-2">
-                            <?php if (!empty($editArticle['thumbnail'])): ?>
-                                <img src="<?= $baseUrl ?>/public/uploads/articles/<?= rawurlencode(basename($editArticle['thumbnail'])) ?>"
-                                     alt="Thumbnail" class="img-thumbnail" style="max-height: 90px;">
+                            <?php if (!empty($editArticle['thumbnail']) && ($currentThumbnailUrl = $thumbnailUrl($editArticle['thumbnail'])) !== null): ?>
+                                <img src="<?= $e($currentThumbnailUrl) ?>" alt="Ảnh đại diện hiện tại" class="img-thumbnail" style="max-height: 140px;">
+                                <p class="small text-muted mb-1">Đang dùng: <code><?= $e($editArticle['thumbnail']) ?></code></p>
+                                <label class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" name="remove_thumbnail" value="1">
+                                    <span class="form-check-label">Gỡ ảnh đại diện hiện tại (không chọn ảnh mới)</span>
+                                </label>
+                            <?php elseif (!empty($editArticle['thumbnail'])): ?>
+                                <p class="text-warning small">Database đang trỏ tới <code><?= $e($editArticle['thumbnail']) ?></code> nhưng file không có trong thư mục lưu ảnh. Hãy tải ảnh mới để thay thế.</p>
                             <?php endif; ?>
                         </div>
+                        <p class="small text-muted mt-2 mb-0">Lưu file tại <code>public/uploads/articles/</code>; database chỉ lưu tên file trong <code>articles.thumbnail</code>.</p>
                     </div>
 
                     <!-- Upload Nhiều ảnh phụ -->
                     <div class="col-md-5">
-                        <label for="images" class="form-label fw-semibold">Thư viện ảnh đính kèm (Chọn nhiều ảnh)</label>
-                        <input type="file" id="images" name="images[]" class="form-control" accept="image/*" multiple>
+                        <label for="images" class="form-label fw-semibold">Thư viện ảnh trong bài (chọn nhiều ảnh)</label>
+                        <input type="file" id="images" name="images[]" class="form-control" accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif" multiple>
+                        <small class="form-text">Ảnh nội dung được lưu thành file riêng và hiển thị ở mục “Trong bài viết”. Dùng nút này thay vì chèn ảnh bằng URL trong trình soạn thảo.</small>
                         
                         <!-- Preview ảnh mới chọn bằng jQuery -->
                         <div id="multiImagePreview" class="preview-grid"></div>
@@ -144,7 +167,8 @@ $formAction = $editArticle
                             <div class="preview-grid">
                                 <?php foreach ($editArticle['images'] as $img): ?>
                                     <div class="position-relative">
-                                        <img src="<?= $baseUrl ?>/public/uploads/articles/<?= rawurlencode(basename($img['image_path'])) ?>" alt="<?= htmlspecialchars($img['alt_text'] ?? 'Ảnh phụ', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
+                                        <?php $galleryUrl = $thumbnailUrl($img['image_path'] ?? null); ?>
+                                        <?php if ($galleryUrl !== null): ?><img src="<?= $e($galleryUrl) ?>" alt="<?= $e($img['alt_text'] ?? 'Ảnh phụ') ?>"><?php else: ?><span class="badge bg-warning text-dark">Thiếu file ảnh</span><?php endif; ?>
                                         <label class="visually-hidden" for="image-order-<?= (int)$img['id'] ?>">Thứ tự ảnh</label>
                                         <input class="form-control form-control-sm mt-1" id="image-order-<?= (int)$img['id'] ?>" type="number" min="0" name="image_order[<?= (int)$img['id'] ?>]" value="<?= (int)($img['sort_order'] ?? 0) ?>">
                                         <button type="submit"
@@ -217,11 +241,13 @@ $formAction = $editArticle
                             <tr>
                                 <td>#<?= $row['id'] ?></td>
                                 <td>
-                                    <?php if (!empty($row['thumbnail'])): ?>
-                                        <img src="<?= $baseUrl ?>/public/uploads/articles/<?= rawurlencode(basename($row['thumbnail'])) ?>"
-                                             style="width: 64px; height: 44px; object-fit: cover;" class="rounded" alt="Thumb">
+                                    <?php $rowThumbnailUrl = $thumbnailUrl($row['thumbnail'] ?? null); ?>
+                                    <?php if ($rowThumbnailUrl !== null): ?>
+                                        <img src="<?= $e($rowThumbnailUrl) ?>" style="width: 64px; height: 44px; object-fit: cover;" class="rounded" alt="Ảnh: <?= $e($row['title'] ?? '') ?>">
+                                    <?php elseif (!empty($row['thumbnail'])): ?>
+                                        <span class="badge bg-warning text-dark">Thiếu file</span>
                                     <?php else: ?>
-                                        <span class="badge bg-secondary">No Image</span>
+                                        <span class="badge bg-secondary">Chưa có ảnh</span>
                                     <?php endif; ?>
                                 </td>
                                 <td class="fw-semibold" style="max-width: 320px;">
@@ -293,8 +319,8 @@ $formAction = $editArticle
                     selector: '#editor',
                     height: 320,
                     menubar: false,
-                    plugins: 'lists link image table code wordcount',
-                    toolbar: 'undo redo | blocks | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image table | code'
+                    plugins: 'lists link table code wordcount',
+                    toolbar: 'undo redo | blocks | bold italic underline | alignleft aligncenter alignright | bullist numlist | link table | code'
                 })).then(() => {
                     editor.required = false;
                 }).catch(showEditorFallback);
@@ -338,6 +364,8 @@ $formAction = $editArticle
 
         document.getElementById('thumbnail')?.addEventListener('change', (event) => {
             const input = event.currentTarget;
+            const removeCheckbox = document.querySelector('input[name="remove_thumbnail"]');
+            if (input.files?.[0] && removeCheckbox) removeCheckbox.checked = false;
             previewImage(input.files?.[0], document.getElementById('thumbnailPreview'), 'Ảnh đại diện xem trước');
         });
 

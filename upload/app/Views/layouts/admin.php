@@ -31,16 +31,17 @@ $currentLabel = $adminLinks[$currentSection][0];
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1d33">
     <meta name="color-scheme" content="light">
+    <meta name="news-hub-build" content="20261120-image-pipeline-1">
     <title><?= $pageTitle ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="<?= $escape($baseUrl . '/public/css/style.css?v=20261119-6') ?>" rel="stylesheet">
-    <link href="<?= $escape($baseUrl . '/public/css/admin.css?v=20261119-6') ?>" rel="stylesheet">
-    <link href="<?= $escape($baseUrl . '/public/css/finish.css?v=20261119-6') ?>" rel="stylesheet">
-    <link href="<?= $escape($baseUrl . '/public/css/editorial-refresh.css?v=20261120-1') ?>" rel="stylesheet">
-    <link href="<?= $escape($baseUrl . '/public/css/editorial-redesign.css?v=20261120-2') ?>" rel="stylesheet">
+    <link href="<?= $escape($baseUrl . '/public/css/style.css?v=20261120-image-pipeline-1') ?>" rel="stylesheet">
+    <link href="<?= $escape($baseUrl . '/public/css/admin.css?v=20261120-image-pipeline-1') ?>" rel="stylesheet">
+    <link href="<?= $escape($baseUrl . '/public/css/finish.css?v=20261120-image-pipeline-1') ?>" rel="stylesheet">
+    <link href="<?= $escape($baseUrl . '/public/css/editorial-refresh.css?v=20261120-image-pipeline-1') ?>" rel="stylesheet">
+    <link href="<?= $escape($baseUrl . '/public/css/editorial-redesign.css?v=20261120-image-pipeline-1') ?>" rel="stylesheet">
 </head>
 <body class="admin-app">
     <a class="skip-link" href="#admin-main">Bỏ qua điều hướng</a>
@@ -78,7 +79,7 @@ $currentLabel = $adminLinks[$currentSection][0];
         </div>
     </div>
     <footer class="admin-footer"><div class="container-fluid"><span>NEWS HUB · Quản trị nội dung</span><a href="<?= $escape($baseUrl . '/') ?>">Mở trang tin công khai</a></div></footer>
-    <script src="<?= $escape($baseUrl . '/public/js/main.js') ?>" defer></script>
+    <script src="<?= $escape($baseUrl . '/public/js/main.js?v=20261120-image-pipeline-1') ?>" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" defer></script>
 </body>
 </html>

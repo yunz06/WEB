@@ -1,0 +1,8 @@
+NEWS HUB — dọn tài nguyên ảnh cũ sau khi deploy source mới
+
+1. Source mới chỉ dùng ảnh bài viết trong public/uploads/articles/.
+2. Sau khi backup, xóa thư mục public/uploads/editorial/ trên hosting nếu nó còn tồn tại.
+3. KHÔNG xóa public/uploads/articles/: thư mục này có ảnh mẫu và ảnh quản trị viên upload.
+4. public/js/editorial-refresh.js được giữ là no-op để ghi đè bản cũ từng tự thay thumbnail.
+5. Không chạy lại SQL seed trên database production đang có dữ liệu thật.
+6. Chạy LOCAL_SETUP/05-image-storage-audit.sql sau backup để tạo index còn thiếu và kiểm tra DB references.

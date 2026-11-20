@@ -1,3 +1,4 @@
+-- After this initial seed, import 03-editorial-refresh-content.sql to align all eight sample stories and their thumbnails with the current article photo set.
 -- NEWS HUB production content for InfinityFree/MySQL 8 or MariaDB 11.4.
 -- Run only after 01-schema-infinityfree.sql and after creating one Admin account.
 -- This script inserts 26 categories and 8 curated original summaries with source links.

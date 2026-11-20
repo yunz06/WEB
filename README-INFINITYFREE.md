@@ -8,7 +8,7 @@ NEWS HUB là website tin tức PHP MVC sử dụng PHP 8.2+, PDO MySQL, HTML/CSS
 - `LOCAL_SETUP/01-schema-infinityfree.sql`: tạo sáu bảng và hai role trong database đã tạo từ Control Panel.
 - `LOCAL_SETUP/generate-admin-sql.ps1`: tạo SQL bootstrap Admin bằng mật khẩu nhập ẩn, chạy trên Windows + XAMPP PHP CLI.
 - `LOCAL_SETUP/02-production-content-infinityfree.sql`: tạo 26 danh mục và tám bài biên tập có nguồn. Không có tài khoản demo, bình luận demo hay 36 bài placeholder.
-- `README-INFINITYFREE.md`: hướng dẫn triển khai đầy đủ.
+- `README-INFINITYFREE.md`: hướng dẫn triển khai; xem thêm `README-FINAL-SETUP.md` để biết quy trình upload/thay ảnh và database migration.
 
 ## Lưu ý dữ liệu
 
@@ -128,7 +128,6 @@ htdocs/
     uploads/
       .htaccess
       articles/
-      editorial/
 ```
 
 Đừng để thành `htdocs/upload/index.php` hoặc `htdocs/Webtintuc/index.php`. InfinityFree yêu cầu file website nằm trực tiếp trong `htdocs` của domain.
@@ -142,6 +141,13 @@ Mở domain/subdomain được cấp:
 - Đăng ký User: `https://TEN-MIEN-CUA-BAN/AuthController/register`
 
 Kiểm tra theo thứ tự: trang chủ → danh mục → bài viết → đăng ký User → đăng nhập/đăng xuất → Admin login → tạo bài nháp → sửa bài → upload nhiều ảnh (tổng dưới 18 MB/request) → xuất bản → kiểm tra trên trình duyệt ẩn danh → duyệt bình luận.
+
+## Lưu ý hình ảnh và database
+
+- Ảnh bài viết được lưu ở `public/uploads/articles/`; database chỉ lưu tên file trong `articles.thumbnail` hoặc `article_images.image_path`.
+- Nếu database đang giữ nội dung mẫu APEC/VNPT đời đầu từ SQL `02`, backup rồi chạy `LOCAL_SETUP/03-editorial-refresh-content.sql` để đồng bộ nội dung và ảnh của 8 bài mẫu. Không chạy nếu đã biên tập lại các slug này.
+- Khi database đã tồn tại, có thể chạy `LOCAL_SETUP/05-image-storage-audit.sql` để bổ sung schema ảnh còn thiếu và index, rồi kiểm tra giá trị ảnh.
+- Không xóa `public/uploads/articles/` khi deploy hoặc dọn ảnh cũ.
 
 ## Lưu ý giới hạn InfinityFree
 

@@ -52,7 +52,7 @@ After the first deploy, every push to `main` that changes files under `upload/` 
 - `dangerous-clean-slate` is disabled; the action will not empty the entire `htdocs` folder.
 - `config/database.local.php` is generated from Secrets and is not committed.
 - FTP credentials and database credentials are stored only as GitHub Actions Secrets.
-- `public/uploads/` is part of the deployment source so the initial editorial images are uploaded. Admin uploads use random filenames and are not committed to Git. Do not commit or delete user-uploaded files in that folder through Git.
+- `public/uploads/articles/` is part of the deployment source and contains only the starter article photos. Admin uploads use random filenames and are not committed to Git. Do not commit, overwrite, or delete user-uploaded files in that folder through Git.
 - The deployment is code/assets only. Database schema and content are already initialized separately in InfinityFree phpMyAdmin; do not import seed or setup SQL again.
 
 ## 6. If the deployment fails

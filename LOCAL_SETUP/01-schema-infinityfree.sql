@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS `articles` (
     KEY `idx_articles_status_created_at` (`status`, `created_at`),
     KEY `idx_articles_category_status_created_at` (`category_id`, `status`, `created_at`),
     KEY `idx_articles_featured_published_at` (`status`, `is_featured`, `published_at`),
+    KEY `idx_articles_thumbnail` (`thumbnail`),
     CONSTRAINT `fk_articles_category`
         FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`)
         ON DELETE RESTRICT
@@ -98,6 +99,7 @@ CREATE TABLE IF NOT EXISTS `article_images` (
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_article_images_article_id` (`article_id`),
+    KEY `idx_article_images_image_path` (`image_path`),
     CONSTRAINT `fk_article_images_article`
         FOREIGN KEY (`article_id`) REFERENCES `articles` (`id`)
         ON DELETE CASCADE

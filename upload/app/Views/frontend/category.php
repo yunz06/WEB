@@ -6,11 +6,8 @@ $category = $data['category'] ?? null;
 $articles = $data['articles'] ?? [];
 $parentCategory = $data['parentCategory'] ?? null;
 $childCategories = $data['childCategories'] ?? [];
-$imageUrl = static function (array $article) use ($baseUrl, $e): ?string {
-    $filename = basename(trim((string)($article['thumbnail'] ?? '')));
-    if ($filename === '' || !is_file(__DIR__ . '/../../../public/uploads/articles/' . $filename)) return null;
-    return $e($baseUrl . '/public/uploads/articles/' . rawurlencode($filename));
-};
+require_once __DIR__ . '/../../Core/ArticleImage.php';
+$imageUrl = static fn(array $article): ?string => ArticleImage::url($article['thumbnail'] ?? null, $baseUrl);
 $dateLabel = static function (array $article): string {
     $timestamp = strtotime((string)($article['published_at'] ?? ''));
     return $timestamp === false ? '' : date('d/m/Y', $timestamp);
@@ -36,7 +33,7 @@ ob_start();
             <?php foreach ($articles as $article): ?>
                 <article class="latest-story"><a class="latest-story__media" href="<?= $e($baseUrl . '/FrontendArticleController/show/' . (int)$article['id']) ?>">
                     <?php $thumbnail = $imageUrl($article); if ($thumbnail !== null): ?>
-                        <img src="<?= $thumbnail ?>" width="800" height="600" alt="Ảnh bài viết: <?= $e($article['title']) ?>" loading="lazy">
+                        <img src="<?= $e($thumbnail) ?>" width="800" height="600" alt="Ảnh bài viết: <?= $e($article['title']) ?>" loading="lazy">
                     <?php else: ?><span class="latest-story__placeholder">NEWS HUB</span><?php endif; ?></a>
                     <div class="latest-story__body"><h2 class="h4"><a href="<?= $e($baseUrl . '/FrontendArticleController/show/' . (int)$article['id']) ?>"><?= $e($article['title']) ?></a></h2>
                     <?php if (!empty($article['summary'])): ?><p><?= $e($article['summary']) ?></p><?php endif; ?>

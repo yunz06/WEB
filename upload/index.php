@@ -16,6 +16,21 @@ function newsHubRespond(int $statusCode, string $message, array $headers = []): 
     exit;
 }
 
+
+function newsHubParseIniBytes(string $value): int
+{
+    $value = trim($value);
+    if ($value === '') return 0;
+    $unit = strtolower(substr($value, -1));
+    $number = (float)$value;
+    return (int)($number * match ($unit) {
+        'g' => 1024 ** 3,
+        'm' => 1024 ** 2,
+        'k' => 1024,
+        default => 1,
+    });
+}
+
 function newsHubCsrfTokenIsValid(): bool
 {
     $submitted = $_POST['csrf_token'] ?? null;
@@ -77,6 +92,15 @@ try {
         session_start();
     }
     newsHubRefreshSessionUser();
+
+    if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+        $contentLength = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+        $postLimit = newsHubParseIniBytes((string)ini_get('post_max_size'));
+        if ($contentLength > 0 && $postLimit > 0 && $contentLength > $postLimit
+            && $_POST === [] && $_FILES === []) {
+            newsHubRespond(413, 'Dữ liệu gửi lên vượt giới hạn post_max_size của hosting. Hãy giảm dung lượng ảnh rồi thử lại.');
+        }
+    }
 
     // Only explicitly listed controller actions can be dispatched.
     $routes = [
@@ -243,7 +267,7 @@ try {
     call_user_func_array([$controller, $action], $parameters);
 } catch (Throwable $exception) {
     if ($exception instanceof InvalidArgumentException) {
-        newsHubRespond(422, 'Dữ liệu gửi lên không hợp lệ.');
+        newsHubRespond(422, $exception->getMessage() !== '' ? $exception->getMessage() : 'Dữ liệu gửi lên không hợp lệ.');
     }
     newsHubServerError($exception);
 }

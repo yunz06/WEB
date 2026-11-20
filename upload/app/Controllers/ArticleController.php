@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../Core/ArticleImage.php';
+
 class ArticleController extends Controller
 {
     private Article $articleModel;
@@ -60,6 +62,7 @@ class ArticleController extends Controller
             $this->deleteFiles($files);
             throw $e;
         }
+        $_SESSION['success'] = 'Đã lưu bài viết. Ảnh được lưu trong thư mục uploads/articles.';
         $this->redirect('/ArticleController/edit/' . $id);
     }
 
@@ -74,12 +77,17 @@ class ArticleController extends Controller
         $data['published_at'] = $data['status'] === 'published'
             ? (($old['status'] === 'published' && !empty($old['published_at'])) ? $old['published_at'] : date('Y-m-d H:i:s'))
             : null;
-        $oldThumbnail = $old['thumbnail'];
+        $oldThumbnail = $old['thumbnail'] ?? null;
+        $removeThumbnail = isset($_POST['remove_thumbnail']) && $_POST['remove_thumbnail'] === '1';
         $files = [];
         try {
             $thumbnail = $this->uploadOne($_FILES['thumbnail'] ?? null);
-            $data['thumbnail'] = $thumbnail === null ? $oldThumbnail : basename($thumbnail);
-            if ($thumbnail !== null) $files[] = $thumbnail;
+            if ($thumbnail !== null) {
+                $data['thumbnail'] = basename($thumbnail);
+                $files[] = $thumbnail;
+            } else {
+                $data['thumbnail'] = $removeThumbnail ? null : $oldThumbnail;
+            }
             $gallery = $this->uploadMany($_FILES['images'] ?? null);
             $files = array_merge($files, $gallery);
             $this->pdo->beginTransaction();
@@ -96,7 +104,13 @@ class ArticleController extends Controller
             $this->deleteFiles($files);
             throw $e;
         }
-        if ($thumbnail !== null && $oldThumbnail) $this->deleteIfUnreferenced((string)$oldThumbnail);
+        if (($thumbnail !== null || $removeThumbnail) && is_string($oldThumbnail) && $oldThumbnail !== ''
+            && $oldThumbnail !== ($data['thumbnail'] ?? null)) {
+            $this->deleteIfUnreferenced($oldThumbnail);
+        }
+        $_SESSION['success'] = $thumbnail !== null
+            ? 'Đã cập nhật bài viết và thay ảnh đại diện.'
+            : ($removeThumbnail ? 'Đã cập nhật bài viết và gỡ ảnh đại diện.' : 'Đã cập nhật bài viết.');
         $this->redirect('/ArticleController/edit/' . $id);
     }
 
@@ -109,20 +123,28 @@ class ArticleController extends Controller
             $this->articleModel->delete($id);
             foreach (array_unique($paths) as $path) $this->deleteIfUnreferenced((string)$path);
         }
+        $_SESSION['success'] = 'Đã xóa bài viết.';
         $this->redirect('/ArticleController/index');
     }
 
     public function deleteImage(int $imageId, int $articleId): void
     {
         $path = $this->articleModel->deleteArticleImage($imageId, $articleId);
-        if ($path) $this->deleteIfUnreferenced((string)$path);
+        if ($path) {
+            $this->deleteIfUnreferenced((string)$path);
+            $_SESSION['success'] = 'Đã xóa ảnh nội dung.';
+        }
         $this->redirect('/ArticleController/edit/' . $articleId);
     }
 
     private function renderList(int $page, ?array $editArticle, array $filters = [], ?int $total = null, int $limit = 10): void
     {
         $total ??= $this->articleModel->countAllAdmin($filters);
+        $storageReady = is_dir($this->uploadDir)
+            ? is_writable($this->uploadDir)
+            : (is_dir(dirname($this->uploadDir)) && is_writable(dirname($this->uploadDir)));
         $this->view('admin/articles', ['page_title' => 'Quản lý bài viết — NEWS HUB', 'baseUrl' => $this->baseUrl,
+            'imageStorageReady' => $storageReady,
             'articles' => $this->articleModel->getAllAdmin($limit, ($page - 1) * $limit, $filters),
             'categories' => $this->categoryModel->getAll(200, 0), 'editArticle' => $editArticle, 'page' => $page,
             'totalPages' => max(1, (int)ceil($total / $limit)), 'totalArticles' => $total,
@@ -199,39 +221,104 @@ class ArticleController extends Controller
 
     private function uploadOne(?array $file): ?string
     {
-        if ($file === null || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) return null;
-        if (!isset($file['error'], $file['tmp_name'], $file['name'], $file['size']) || is_array($file['error'])
-            || $file['error'] !== UPLOAD_ERR_OK || (int)$file['size'] > self::MAX_SINGLE_IMAGE_BYTES
-            || !is_uploaded_file($file['tmp_name'])) throw new InvalidArgumentException('Ảnh tải lên không hợp lệ hoặc vượt giới hạn 5 MB mỗi ảnh.');
-        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
-        $extensions = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
-        $extension = $extensions[$mime] ?? null;
-        $givenExtension = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));
-        if (!$extension || !in_array($givenExtension, ['jpg','jpeg','png','webp','gif'], true) || !getimagesize($file['tmp_name']))
+        if ($file === null) {
+            return null;
+        }
+
+        $error = $file['error'] ?? UPLOAD_ERR_NO_FILE;
+        if ($error === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+        if (!is_int($error) && !ctype_digit((string)$error)) {
+            throw new InvalidArgumentException('Thông tin ảnh tải lên không hợp lệ.');
+        }
+        $error = (int)$error;
+        if ($error !== UPLOAD_ERR_OK) {
+            $messages = [
+                UPLOAD_ERR_INI_SIZE => 'Ảnh vượt giới hạn upload_max_filesize của hosting.',
+                UPLOAD_ERR_FORM_SIZE => 'Ảnh vượt giới hạn dung lượng của biểu mẫu.',
+                UPLOAD_ERR_PARTIAL => 'Ảnh chỉ được tải lên một phần. Vui lòng chọn lại.',
+                UPLOAD_ERR_NO_TMP_DIR => 'Hosting thiếu thư mục tạm để nhận ảnh.',
+                UPLOAD_ERR_CANT_WRITE => 'Hosting không thể ghi ảnh lên ổ đĩa.',
+                UPLOAD_ERR_EXTENSION => 'Một tiện ích PHP đã chặn việc tải ảnh lên.',
+            ];
+            throw new InvalidArgumentException($messages[$error] ?? 'Không thể nhận ảnh tải lên.');
+        }
+
+        $tmpName = $file['tmp_name'] ?? null;
+        $size = filter_var($file['size'] ?? null, FILTER_VALIDATE_INT);
+        if (!is_string($tmpName) || $tmpName === '' || $size === false || $size < 1
+            || $size > self::MAX_SINGLE_IMAGE_BYTES || !is_uploaded_file($tmpName)) {
+            throw new InvalidArgumentException('Ảnh không hợp lệ hoặc vượt giới hạn 5 MB mỗi ảnh.');
+        }
+
+        $imageInfo = @getimagesize($tmpName);
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmpName);
+        $extensions = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            'image/gif' => 'gif',
+        ];
+        $extension = is_string($mime) ? ($extensions[$mime] ?? null) : null;
+        if ($extension === null || !is_array($imageInfo) || empty($imageInfo[0]) || empty($imageInfo[1])) {
             throw new InvalidArgumentException('Chỉ nhận ảnh JPG, PNG, WEBP hoặc GIF hợp lệ.');
-        if (!is_dir($this->uploadDir) && !mkdir($this->uploadDir, 0755, true) && !is_dir($this->uploadDir))
-            throw new RuntimeException('Upload directory unavailable.');
+        }
+        if ((int)$imageInfo[0] * (int)$imageInfo[1] > 40000000) {
+            throw new InvalidArgumentException('Ảnh có độ phân giải quá lớn. Vui lòng chọn ảnh tối đa 40 megapixel.');
+        }
+
+        if (!is_dir($this->uploadDir) && !mkdir($this->uploadDir, 0755, true) && !is_dir($this->uploadDir)) {
+            throw new RuntimeException('Không thể tạo thư mục lưu ảnh.');
+        }
+        if (!is_writable($this->uploadDir)) {
+            throw new RuntimeException('Thư mục public/uploads/articles không có quyền ghi.');
+        }
+
         $target = $this->uploadDir . '/' . bin2hex(random_bytes(20)) . '.' . $extension;
-        if (!move_uploaded_file($file['tmp_name'], $target)) throw new RuntimeException('Image upload failed.');
+        if (!move_uploaded_file($tmpName, $target)) {
+            throw new RuntimeException('Không thể lưu ảnh vào public/uploads/articles.');
+        }
+
         return $target;
     }
 
     private function uploadMany(?array $files): array
     {
-        if ($files === null || !isset($files['name']) || !is_array($files['name'])) return [];
-        if (count($files['name']) > 10) throw new InvalidArgumentException('Tối đa 10 ảnh nội dung mỗi lần tải.');
-        $stored = [];
-        foreach ($files['name'] as $index => $name) {
-            $error = $files['error'][$index] ?? UPLOAD_ERR_NO_FILE;
-            if ($error === UPLOAD_ERR_NO_FILE) continue;
-            try {
-                $stored[] = $this->uploadOne(['name' => $name, 'tmp_name' => $files['tmp_name'][$index] ?? '',
-                    'error' => $error, 'size' => $files['size'][$index] ?? 0]);
-            } catch (Throwable $e) {
-                $this->deleteFiles($stored);
-                throw $e;
-            }
+        if ($files === null) {
+            return [];
         }
+        if (!isset($files['name'], $files['tmp_name'], $files['error'], $files['size'])
+            || !is_array($files['name']) || !is_array($files['tmp_name'])
+            || !is_array($files['error']) || !is_array($files['size'])) {
+            throw new InvalidArgumentException('Danh sách ảnh nội dung không hợp lệ.');
+        }
+        if (count($files['name']) > 10) {
+            throw new InvalidArgumentException('Tối đa 10 ảnh nội dung mỗi lần tải.');
+        }
+
+        $stored = [];
+        try {
+            foreach ($files['name'] as $index => $name) {
+                $error = $files['error'][$index] ?? UPLOAD_ERR_NO_FILE;
+                if ((int)$error === UPLOAD_ERR_NO_FILE) {
+                    continue;
+                }
+                $storedPath = $this->uploadOne([
+                    'name' => $name,
+                    'tmp_name' => $files['tmp_name'][$index] ?? '',
+                    'error' => $error,
+                    'size' => $files['size'][$index] ?? 0,
+                ]);
+                if ($storedPath !== null) {
+                    $stored[] = $storedPath;
+                }
+            }
+        } catch (Throwable $exception) {
+            $this->deleteFiles($stored);
+            throw $exception;
+        }
+
         return $stored;
     }
 
@@ -242,7 +329,10 @@ class ArticleController extends Controller
 
     private function deleteIfUnreferenced(string $path): void
     {
-        if (basename($path) !== $path || !preg_match('/\A[a-f0-9]{40}\.(?:jpg|png|webp|gif)\z/i', $path)) return;
+        if (ArticleImage::filename($path) === null
+            || !preg_match('/\A[a-f0-9]{40}\.(?:jpg|png|webp|gif)\z/i', $path)) {
+            return;
+        }
         if (!$this->articleModel->fileIsReferenced($path)) {
             $full = $this->uploadDir . '/' . $path;
             if (is_file($full)) unlink($full);

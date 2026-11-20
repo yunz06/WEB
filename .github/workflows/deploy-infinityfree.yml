@@ -57,8 +57,13 @@ jobs:
           test "$count" -gt 0
           echo "PHP files checked: $count"
 
+      - name: Image path regression tests
+        run: php tests/test_article_image.php
+
       - name: JavaScript syntax
-        run: node --check upload/public/js/main.js
+        run: |
+          node --check upload/public/js/main.js
+          node --check upload/public/js/editorial-refresh.js
 
       - name: Prevent committed production credentials
         shell: bash
